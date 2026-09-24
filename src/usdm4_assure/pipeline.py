@@ -19,6 +19,7 @@ from pathlib import Path
 
 from usdm4_assure.assemble.metadata import assemble_metadata
 from usdm4_assure.assure import assure
+from usdm4_assure.assure.completeness import account, demote_on_error
 from usdm4_assure.contracts import AssuredField, Decision, FieldCandidate, Finding
 from usdm4_assure.extract import metadata as c1
 from usdm4_assure.extract.design import DESIGN_FIELDS
@@ -169,6 +170,11 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
             json.dumps(study["wrapper"], indent=2, default=str), encoding="utf-8")
 
     all_assured = assured_meta + assured_design + assured_eligibility + assured_objectives
+    # Completeness (task 3.6): expected-vs-found across domains, over current-scope text.
+    gaps = account(design=design, grid=grid, eligibility=elig, objectives=objs,
+                   wrapper=study.get("wrapper"), evidence_text=design_doc.full_text)
+    findings += gaps
+    demote_on_error(all_assured, gaps)
     review = {
         "source": str(pdf_path),
         "decision_summary": {d.value: 0 for d in Decision},

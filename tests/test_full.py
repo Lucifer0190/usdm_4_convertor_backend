@@ -83,3 +83,8 @@ def test_review_records_route_plan(result):
     assert review["routing"]["route_plan_hash"] == result.routed.plan_hash
     assert set(review["routing"]["windows"]) == {"metadata", "design", "eligibility", "objectives"}
     assert isinstance(review["findings"], list)
+
+
+def test_complete_protocol_has_no_completeness_findings(result):
+    # False-positive guard for task 3.6: the fixture is a complete protocol.
+    assert [f for f in result.findings if f.kind.value == "completeness"] == []
