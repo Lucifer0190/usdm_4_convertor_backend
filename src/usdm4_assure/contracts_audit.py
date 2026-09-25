@@ -24,6 +24,7 @@ class AuditEvent(str, Enum):
     EXTRACTION = "extraction"    # the pipeline decided a value
     REVIEW_EDIT = "review_edit"  # a reviewer changed / confirmed a value
     CERTIFY = "certify"          # a reviewer signed off the run (signature meaning set)
+    CALIBRATION = "calibration"  # the confidence model + conformal bound in force for a run
 
 
 def utc_now() -> str:

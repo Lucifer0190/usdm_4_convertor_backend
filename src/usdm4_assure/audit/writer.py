@@ -7,9 +7,21 @@ has produced its :class:`~usdm4_assure.contracts.AssuredField` list.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from usdm4_assure.audit.store import AuditStore
 from usdm4_assure.contracts import AssuredField, GroundedCandidate
 from usdm4_assure.contracts_audit import AuditEvent, AuditRecord
+
+if TYPE_CHECKING:
+    from usdm4_assure.assure.conformal import ConformalBound
+
+
+def _bound_summary(bound: ConformalBound) -> dict:
+    """What a field-level record needs to cite the bound it was triaged under."""
+    return {"alpha": bound.alpha, "delta": bound.delta, "threshold": bound.threshold,
+            "model_hash": bound.model_hash, "calibration_hash": bound.calibration_hash,
+            "refused_reason": bound.refused_reason}
 
 
 def _winning_candidate(assured: AssuredField) -> GroundedCandidate | None:
@@ -28,7 +40,8 @@ def _winning_candidate(assured: AssuredField) -> GroundedCandidate | None:
 def write_field_decision(store: AuditStore, *, run_id: str, source_sha256: str,
                           domain: str, assured: AssuredField,
                           pipeline_version: str | None = None,
-                          retrieval_config: dict | None = None) -> AuditRecord:
+                          retrieval_config: dict | None = None,
+                          bound: ConformalBound | None = None) -> AuditRecord:
     """Append one :class:`AuditRecord` for a single :class:`AssuredField`.
 
     Args:
@@ -41,6 +54,10 @@ def write_field_decision(store: AuditStore, *, run_id: str, source_sha256: str,
         retrieval_config: How the field's evidence was selected — for a
             routed run, the domain's ``EvidenceWindow.retrieval_config()``
             (route name + route-plan hash + what was filtered out).
+        bound: The conformal bound the field was triaged under (task 4.3), as
+            it applied to this protocol. Its threshold fills the record's
+            ``threshold`` column; its model and calibration-set hashes go into
+            ``verification["conformal"]`` so the decision is reproducible.
 
     Returns:
         The :class:`AuditRecord` that was appended.
@@ -55,6 +72,8 @@ def write_field_decision(store: AuditStore, *, run_id: str, source_sha256: str,
         model_id=(winner.model_id if winner else None),
         prompt_hash=(winner.prompt_hash if winner else None),
         retrieval_config=retrieval_config,
+        threshold=(bound.threshold if bound else None),
+        verification=({"conformal": _bound_summary(bound)} if bound else None),
     ).with_quote(quote)
     store.append(record)
     return record
@@ -63,11 +82,34 @@ def write_field_decision(store: AuditStore, *, run_id: str, source_sha256: str,
 def write_run(store: AuditStore, *, run_id: str, source_sha256: str, domain: str,
               assured_fields: list[AssuredField],
               pipeline_version: str | None = None,
-              retrieval_config: dict | None = None) -> list[AuditRecord]:
+              retrieval_config: dict | None = None,
+              bound: ConformalBound | None = None) -> list[AuditRecord]:
     """Append one record per field in ``assured_fields``; returns them in order."""
     return [
         write_field_decision(store, run_id=run_id, source_sha256=source_sha256,
                              domain=domain, assured=a, pipeline_version=pipeline_version,
-                             retrieval_config=retrieval_config)
+                             retrieval_config=retrieval_config, bound=bound)
         for a in assured_fields
     ]
+
+
+def write_calibration(store: AuditStore, *, run_id: str, source_sha256: str,
+                      bound: ConformalBound, model: dict | None = None,
+                      pipeline_version: str | None = None) -> AuditRecord:
+    """Append the run-level record of which confidence model and bound were in force.
+
+    One per run, alongside its field records: the full bound (alpha, delta,
+    threshold, calibration-set size and hash, coverage, the Clopper-Pearson
+    upper bound, strata, or the refusal reason) and, if given, the model's
+    serialised parameters, so the auto-accept decision can be reproduced and
+    defended from the audit store alone.
+    """
+    verification: dict = {"conformal": bound.to_dict()}
+    if model is not None:
+        verification["confidence_model"] = model
+    record = AuditRecord(
+        run_id=run_id, event=AuditEvent.CALIBRATION, source_sha256=source_sha256,
+        domain="assure", field=None, pipeline_version=pipeline_version,
+        threshold=bound.threshold, verification=verification)
+    store.append(record)
+    return record

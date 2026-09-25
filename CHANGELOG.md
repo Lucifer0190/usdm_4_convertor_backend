@@ -28,6 +28,18 @@ Added:
 - `pipeline.FullResult.windows` — each domain's `EvidenceWindow`, exposed for `features.py`.
 - `eval` optional dependency group (`pandas`, `pyarrow`).
 
+CP4-B (task 4.3):
+- `assure/confidence.py` — logistic confidence model + out-of-fold Platt recalibration
+  (leave-one-protocol-out), deterministic `model_hash`, save/load with hash verification.
+- `assure/conformal.py` — certified auto-accept threshold: with probability ≥ 1 − δ over the
+  calibration draw, incorrect fields among auto-accepted ones are ≤ α (marginal; void on
+  exchangeability breaks). Learn-then-Test fixed-sequence testing with exact binomial
+  (Clopper–Pearson) p-values; refuses below 47 calibration points, when nothing certifies,
+  or for a protocol outside the calibration strata. `gate()`, `risk_coverage()`, `aurc()`.
+- `audit.write_calibration()` and `AuditEvent.CALIBRATION`; field records cite the bound's
+  threshold, model hash and calibration-set hash.
+- `numpy` is now a declared dependency (it was already present transitively).
+
 ### Phase 3 complete — Routing, prohibited scopes, completeness (v0.3.3, CP3-A–C)
 
 **Major milestone:** every extraction domain now reads a section-graph-scoped view of the
