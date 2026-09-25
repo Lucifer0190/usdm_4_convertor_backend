@@ -33,13 +33,19 @@ the target v0.3 layout from [`../DESIGN.md`](../DESIGN.md) §6 — planned modul
 | `soa/rederive.py` | Mechanical mark-matrix re-derivation (task 2.6): an independent second read of "is this cell marked", scanning raw character geometry (`Document.chars`) for a mark glyph inside the cell's bbox — never the table parser's own cell text. |
 | `soa/corrections.py` | Append-only `corrections.json` sidecar recording `rederive` disagreements per source PDF. Never mutates the raw `StitchedGrid`/`SoAGrid`. |
 
-## L3 — Routing *(planned, v0.3 Phase 3; ported from prior-art ideas per `PLAN.md` §5)*
+## L3 — Routing *(v0.3 Phase 3, CP3-A–C)*
 
 | Module | Role |
 |---|---|
-| `sections/graph.py` | Typed section graph: authority surfaces, `current` vs `historic` distinction. |
-| `sections/fingerprint.py` | Study-family classification (11 documented protocol families as config data) driving route/prompt/expectation adaptation. |
-| `sections/route_plan.py` | `StudyExtractionPlan` / `DomainRoutePlan` — primary/supporting/**prohibited** evidence scopes per domain, 4-axis scoping (study/phase/arm/region). |
+| `sections/classify.py` | Deterministic title→taxonomy classifier (`config/section_taxonomy.yaml`), keyed on a section's own title words (not ICH section numbers, which older sponsor templates don't follow) with parent inheritance: `appendix` is a sticky type, `amendment_history` a sticky subtype. |
+| `sections/graph.py` | Section graph from the PDF outline or numbered/unnumbered heading blocks — whichever source types more sections. `SectionGraph.section_for(page, y)` locates the innermost open section for any block. The `route`-role LLM is asked only about untyped residue (`classify_residue`), and only a taxonomy label is accepted back. |
+| `sections/fingerprint.py` | Study-family classification: the first of 19 protocol families in `config/protocol_families.yaml` whose detection signal (title page / section titles / parsed phases) matches; the default family is kept but flagged with low confidence when nothing matches. |
+| `sections/plan.py` / `sections/_ported_routes.py` | `build_plan()` feeds the fingerprint into the ported `StudyExtractionPlan` generator (primary/supporting/**prohibited** evidence scopes per domain) and exposes a stable `plan_hash` for the audit trail. |
+| `extract/windows.py` | `window_for(doc, routed, domain)` filters a domain's `Document` down to its route's allowed scopes, plus a currentness guard (amendment-history and historic SoA/amendment surfaces are always excluded, on every domain but `amendments`) that the ported prohibited-scopes alone don't catch — the reference's historic prohibitions name a `source_surfaces` axis this graph doesn't populate. Filtered sections become `SCOPE` findings; a missing section graph is a `WARNING`, not silence. |
+
+*The section title classifier and the currentness guard are ours; the route-mapping tables
+in `sections/_ported_*.py` are near-verbatim ports (DEVPLAN.md's porting rule — no tests of
+their own).*
 
 ## L4 — Extraction
 
@@ -75,7 +81,7 @@ reasoning, then constrained JSON) emission — see DESIGN.md §3 L4.*
 | `audit/writer.py` | Pipeline integration for audit logging: `write_field_decision()` appends one `AuditRecord` per `AssuredField`, pulling model/prompt/quote provenance from the winning grounded candidate. |
 | `assure/confidence.py` *(planned, Phase 4)* | Multi-signal fitted confidence model (grounding outcome, entailment, cross-model agreement, field type, retrieval score) replacing the current hand-set formula. |
 | `assure/conformal.py` *(planned, Phase 4)* | Split-conformal threshold with small-sample correction — a provable, marginal bound on error among auto-accepted fields. |
-| `assure/completeness.py` *(planned, Phase 3)* | Expected-vs-found reconciliation per domain (visit/arm/activity counts) — the direct defence against silent omission. |
+| `assure/completeness.py` | Expected-vs-found reconciliation per domain: arm count vs. randomization ratio, arms×epochs cell coverage in the assembled study, SoA schedule-link integrity, protocol-text visit references vs. SoA columns, footnote markers vs. definitions, objective/endpoint pairing, eligibility list presence. A mismatch is a `COMPLETENESS` finding (`ERROR` demotes that domain's `auto_accept` fields to `review` via `demote_on_error()`); a rule with nothing to compare against stays quiet. |
 
 ## L7 — Assembly
 
@@ -120,10 +126,17 @@ Neo4j graph store, closed-loop SLM fine-tuning at scale, and Merkle/replay audit
 are deliberately deferred per `PLAN.md` §7 — they are valuable Phase-2+ investments, not
 Phase-0/1 scope, and are not represented as empty packages in the tree.
 
+## Evaluation
+
+| Module | Role |
+|---|---|
+| `eval/corpus.py` | usdm_data protocol-PDF loader (`spikes/_work/usdm_data`, gitignored): one `Study(study_id, pdf_path)` per directory whose source PDF matches the directory name (excludes `_USDM`/`_CRF`/`_SoA` derivatives). |
+| `eval/run.py` | Phase 3 exit measurement: runs `run_full()` with routing on and off per study and diffs `AssuredField`s (value + decision) domain-by-field, writing `summary.md`/`summary.json` and a per-study diff. No ground truth yet — Phase 4 (task 4.1) adds frozen labels and a real scorer; until then this reports routing-on-vs-off disagreement and scope-finding counts. |
+
 ## Orchestration & CLI
 
 | Module | Role |
 |---|---|
-| `pipeline.py` | `run()` (metadata spine) and `run_full()` (full loop). Both now route all domains through the uniform `assure()` path and write `review.json` with page + bbox + verify_pass on every row. |
+| `pipeline.py` | `run()` (metadata spine) and `run_full()` (full loop). Both now route all domains through the uniform `assure()` path and write `review.json` with page + bbox + verify_pass on every row. `run_full(routing=...)` builds a section-graph route plan and scopes each domain's evidence window (default on); `routing=False` is the eval harness's unrouted arm. |
 | `cli.py` | `usdm4 version` — print version. `usdm4 roles` — print active model roles from `config/models.yaml`. `usdm4 convert` (metadata spine), `convert-soa` (table-only), `convert-full` (all domains). All accept `--require-llm` to fail on missing API key and `--core` to run CDISC CORE gate. |
 | `contracts.py` | Shared dataclasses: `Document`, `FieldCandidate` (legacy), `GroundedCandidate` (quote-backed), `Quote`, `CharSpan`, `AssuredField`, `Finding`, `AuditRecord`, `Decision`. |

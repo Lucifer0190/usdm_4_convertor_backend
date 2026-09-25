@@ -2,10 +2,10 @@
 
 > **v0.3 note.** This page describes the ten-layer pipeline (see
 > [Architecture](architecture.md)). The implementation is being built in the phases
-> described in [`../PLAN.md`](../PLAN.md). As of Phase 2 (CP2-C, 2026-09-24), the
-> implemented layers are L0 (ingest), L1–L2 (layout + multi-page SoA stitching), L4
-> (sharded extraction), L5 (grounding), L6 (assurance), L7 (assembly), and L8
-> (validation). L3 and L9 are scheduled for Phases 3 and 5.
+> described in [`../PLAN.md`](../PLAN.md). As of Phase 3 (CP3-C, 2026-09-25), the
+> implemented layers are L0 (ingest), L1–L2 (layout + multi-page SoA stitching), L3
+> (routing), L4 (sharded extraction), L5 (grounding), L6 (assurance + completeness),
+> L7 (assembly), and L8 (validation). L9 is scheduled for Phase 5.
 
 Two entry points, both in `usdm4_assure.pipeline`:
 
@@ -19,11 +19,17 @@ Two entry points, both in `usdm4_assure.pipeline`:
 PDF
  │  ingest.pdf.ingest()                         → Document
  ▼
-Document ──┬─ extract.metadata.extract_all()     → list[FieldCandidate]
-           │      └─ assure.assure()             → list[AssuredField]   (C1)
-           ├─ extract.design.extract_design()    → DesignExtract        (C2)
-           ├─ extract.eligibility.extract_*()    → EligibilityExtract   (C3)
-           ├─ extract.objectives.extract_*()     → ObjectivesExtract    (C4)
+Document ──  sections.plan.build_plan()          → RoutedDocument (graph + route plan)
+           │
+           ├─ extract.windows.window_for(...,"metadata")    → EvidenceWindow
+           │      └─ extract.metadata.extract_all()          → list[FieldCandidate]
+           │             └─ assure.assure()                  → list[AssuredField]   (C1)
+           ├─ extract.windows.window_for(...,"design")       → EvidenceWindow
+           │      └─ extract.design.extract_design()         → DesignExtract        (C2)
+           ├─ extract.windows.window_for(...,"eligibility")  → EvidenceWindow
+           │      └─ extract.eligibility.extract_*()         → EligibilityExtract   (C3)
+           ├─ extract.windows.window_for(...,"objectives")   → EvidenceWindow
+           │      └─ extract.objectives.extract_*()          → ObjectivesExtract    (C4)
            └─ extract.soa.methods (×2)           → SoAGrid, SoAGrid
                   │  (pdfplumber; pymupdf_stitched via soa.stitch, falling
                   │   back to single-page pymupdf when the header isn't a
@@ -32,11 +38,16 @@ Document ──┬─ extract.metadata.extract_all()     → list[FieldCandidate
  ▼
 assemble.study.build_full_study(...)             → USDM 4.0 wrapper dict
  │      (data4knowledge Assembler + TimelineAssembler)
+ ├─ assure.completeness.account(...)             → list[Finding]  (expected vs. found)
+ │      └─ demote_on_error(...)                  → ERROR findings demote that domain's auto_accepts
  ▼
 validate.gate.validate_wrapper(...)              → {structural, d4k, core}
  ▼
-data/out_full/study.usdm.json
+data/out_full/study.usdm.json, review.json (fields + findings + routing summary)
 ```
+
+`run_full(routing=False)` skips the plan/window step and gives every extractor the whole
+document — the eval harness's (`eval/run.py`) unrouted comparison arm.
 
 **Phase 1 complete:** as of CP1-C, `assure()` is uniform across C1–C4 (all domains) and SoA,
 applying the shared ensemble/grounding/verifier path per [`../DESIGN.md`](../DESIGN.md)
@@ -50,6 +61,19 @@ tables across page breaks (loud `Finding` on ambiguity, never a silent guess);
 different-family model only on disagreement; `soa/rederive.py` independently re-derives the
 mark matrix from character-glyph geometry (never the table parser's own cell text) and
 records any disagreement to `soa/corrections.py`'s sidecar without touching the raw grid.
+
+**Phase 3 complete:** as of CP3-C, routing is live. `sections/graph.py` builds a section
+graph from the PDF outline or numbered/unnumbered heading blocks (title-keyword
+classification, not ICH section numbers — those break on older sponsor templates);
+`sections/fingerprint.py` picks a protocol family from `config/protocol_families.yaml`'s
+detection signals; `sections/plan.py` feeds that into the ported route planner. Every
+domain's evidence is filtered through `extract/windows.py` to its route's allowed scopes,
+plus a currentness guard that keeps amendment-history and historic-SoA text out of every
+domain but `amendments` — `tests/test_scope_leak.py` demonstrates a superseded 3-arm design
+leaking into the extracted study without routing, and not with it. `assure/completeness.py`
+closes the loop with expected-vs-found accounting (arm counts, SoA schedule links, objective/
+endpoint pairing), demoting a domain's `auto_accept` fields to `review` on an `ERROR` finding.
+`eval/run.py` runs the routing-on/off comparison for the Phase 3 exit measurement.
 
 ## Target data flow (v0.3, in progress)
 

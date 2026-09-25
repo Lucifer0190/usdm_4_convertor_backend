@@ -6,6 +6,50 @@ yet semantically versioned.
 
 ## [Unreleased]
 
+### Phase 3 complete — Routing, prohibited scopes, completeness (v0.3.3, CP3-A–C)
+
+**Major milestone:** every extraction domain now reads a section-graph-scoped view of the
+document instead of the whole PDF. A section graph (from the PDF outline, or numbered and
+unnumbered heading blocks when there is none) is classified onto the four-axis taxonomy by
+title words — not ICH section numbers, which older sponsor templates don't follow — and a
+protocol-family fingerprint drives the ported route planner. Each domain's evidence window
+drops sections its route prohibits, plus a currentness guard that keeps amendment-history and
+historic-SoA text out of every domain but `amendments`. `tests/test_scope_leak.py` documents
+the failure this prevents: a front-matter amendment summary quoting the original 3-arm design
+ahead of the current 2-arm design section — unscoped, the design extractor returns the old
+arm count; scoped, the current one. `assure/completeness.py` adds expected-vs-found checks
+(arm count vs. randomization ratio, SoA schedule-link integrity, objective/endpoint pairing,
+eligibility list presence, …), demoting a domain's `auto_accept` fields to `review` on an
+`ERROR` finding. `eval/run.py` runs the routing-on/off comparison across the usdm_data corpus.
+
+Added:
+- `sections/classify.py` — deterministic title→taxonomy classifier with parent inheritance
+  (sticky `appendix` type, sticky `amendment_history` subtype).
+- `sections/graph.py` — section graph from bookmarks or heading blocks; `classify_residue()`
+  asks the `route`-role LLM only about untyped sections, accepting only taxonomy labels.
+- `sections/fingerprint.py` — protocol-family detection from `config/protocol_families.yaml`
+  signals (title page / section titles / parsed phases), with an honestly-flagged default.
+- `sections/plan.py` — `build_plan()` wires the fingerprint into the ported
+  `StudyExtractionPlan` generator and exposes a stable `plan_hash`.
+- `extract/windows.py` — `EvidenceWindow` / `window_for()`: prohibited-scope filtering plus
+  the currentness guard; filtered sections become `SCOPE` findings.
+- `assure/completeness.py` — expected-vs-found reconciliation, `demote_on_error()`.
+- `eval/corpus.py`, `eval/run.py` — usdm_data protocol-PDF loader and the routing on/off
+  comparison harness.
+- `sections/models.py`, `sections/_ported_routes.py`, `sections/_ported_pages.py`,
+  `config/section_taxonomy.yaml`, `config/protocol_families.yaml` — near-verbatim ports from
+  the reference extractor (route mapping, page-selection heuristics, taxonomy/family data).
+  19 protocol families were kept faithfully to the source, correcting PLAN.md's "11".
+
+Changed:
+- `pipeline.run_full()` gained `routing: bool = True`; `AssuredField`s now come from a scoped
+  `Document` per domain, and `review.json` carries the route plan hash, section-graph summary,
+  and per-domain window/filtering detail.
+- `audit/writer.py` records each field's `retrieval_config` (route + route-plan hash +
+  filtered sections) for the Part 11 trail.
+- `scripts/guard.py` exempts `_ported_*.py` files from the 400-line limit (they are sized by
+  their source, not authored here).
+
 ### Phase 2 complete — Multi-page SoA (v0.3.2, CP2-C)
 
 **Major milestone:** the Schedule of Activities path is now multi-page-aware end to end —
