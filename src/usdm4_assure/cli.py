@@ -137,6 +137,49 @@ def convert_soa(pdf: str) -> None:
     console.print(t)
 
 
+@app.command()
+def eval(study: str = "", out: str = "spikes/reports/eval_scoreboard") -> None:
+    """Score the pipeline against frozen field labels; writes the scoreboard.
+
+    Runs run_full() on every labelled usdm_data study (task 4.1's 4 held-out
+    protocols), scores the output with eval.score, and reports auto-accept
+    coverage, review burden and realized error (DESIGN.md L6) overall and per
+    domain. Pass --study "id1,id2" to score only specific studies.
+    """
+    from pathlib import Path
+
+    from usdm4_assure.eval.report import run_eval
+
+    console.rule("[bold]USDM4-Assure — eval scoreboard")
+    study_ids = [s.strip() for s in study.split(",") if s.strip()] or None
+    sb = run_eval(study_ids=study_ids, out_dir=Path(out))
+    if not sb.studies:
+        console.print("[red]No studies scored.[/] " + "; ".join(sb.errors))
+        return
+
+    console.print(f"Studies: [cyan]{', '.join(sb.studies)}[/] ({sb.n_labels_total} labels)")
+    if sb.errors:
+        console.print(f"[yellow]{len(sb.errors)} error(s):[/] {'; '.join(sb.errors)}")
+
+    t = Table(title="Scoreboard")
+    for col in ("domain", "fields", "auto-accept coverage", "review burden",
+               "realized error", "accuracy of found"):
+        t.add_column(col)
+
+    def _pct(x: float | None) -> str:
+        return "—" if x is None else f"{x * 100:.1f}%"
+
+    t.add_row("overall", str(sb.overall.n_fields), _pct(sb.overall.auto_accept_coverage),
+             _pct(sb.overall.review_burden), _pct(sb.overall.realized_error),
+             _pct(sb.overall.accuracy_of_found))
+    for domain in sorted(sb.by_domain):
+        d = sb.by_domain[domain]
+        t.add_row(domain, str(d.n_fields), _pct(d.auto_accept_coverage), _pct(d.review_burden),
+                 _pct(d.realized_error), _pct(d.accuracy_of_found))
+    console.print(t)
+    console.print(f"Wrote [dim]{out}.md[/] and [dim]{out}.json[/]")
+
+
 def _g(s) -> str:
     if not s:
         return "—"

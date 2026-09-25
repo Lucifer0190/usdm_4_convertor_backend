@@ -1,0 +1,112 @@
+{
+  "generated_at": "2026-09-25T05:47:28+00:00",
+  "studies": [
+    "Alexion_NCT04573309_Wilsons",
+    "CDISC_Pilot",
+    "EliLilly_NCT03421379_Diabetes",
+    "Sanofi_NCT03637764_Oncology"
+  ],
+  "n_labels_total": 62,
+  "errors": [],
+  "overall": {
+    "domain": "overall",
+    "n_fields": 68,
+    "n_auto_accept": 7,
+    "n_review": 38,
+    "n_block": 23,
+    "n_labelled": 62,
+    "n_labelled_auto_accept": 7,
+    "n_labelled_auto_accept_correct": 6,
+    "verdicts": {
+      "exact": 9,
+      "miss": 28,
+      "predicted_absent": 20,
+      "fuzzy": 3,
+      "normalized": 2
+    },
+    "auto_accept_coverage": 0.10294117647058823,
+    "review_burden": 0.5588235294117647,
+    "realized_error": 0.1428571428571429,
+    "accuracy_of_found": 0.3333333333333333
+  },
+  "by_domain": {
+    "metadata": {
+      "domain": "metadata",
+      "n_fields": 24,
+      "n_auto_accept": 7,
+      "n_review": 13,
+      "n_block": 4,
+      "n_labelled": 21,
+      "n_labelled_auto_accept": 7,
+      "n_labelled_auto_accept_correct": 6,
+      "verdicts": {
+        "exact": 7,
+        "miss": 8,
+        "fuzzy": 1,
+        "predicted_absent": 3,
+        "normalized": 2
+      },
+      "auto_accept_coverage": 0.2916666666666667,
+      "review_burden": 0.5416666666666666,
+      "realized_error": 0.1428571428571429,
+      "accuracy_of_found": 0.5555555555555556
+    },
+    "design": {
+      "domain": "design",
+      "n_fields": 8,
+      "n_auto_accept": 0,
+      "n_review": 7,
+      "n_block": 1,
+      "n_labelled": 8,
+      "n_labelled_auto_accept": 0,
+      "n_labelled_auto_accept_correct": 0,
+      "verdicts": {
+        "miss": 7,
+        "predicted_absent": 1
+      },
+      "auto_accept_coverage": 0.0,
+      "review_burden": 0.875,
+      "realized_error": null,
+      "accuracy_of_found": 0.0
+    },
+    "eligibility": {
+      "domain": "eligibility",
+      "n_fields": 20,
+      "n_auto_accept": 0,
+      "n_review": 10,
+      "n_block": 10,
+      "n_labelled": 17,
+      "n_labelled_auto_accept": 0,
+      "n_labelled_auto_accept_correct": 0,
+      "verdicts": {
+        "fuzzy": 1,
+        "miss": 6,
+        "predicted_absent": 8,
+        "exact": 2
+      },
+      "auto_accept_coverage": 0.0,
+      "review_burden": 0.5,
+      "realized_error": null,
+      "accuracy_of_found": 0.3333333333333333
+    },
+    "objectives": {
+      "domain": "objectives",
+      "n_fields": 16,
+      "n_auto_accept": 0,
+      "n_review": 8,
+      "n_block": 8,
+      "n_labelled": 16,
+      "n_labelled_auto_accept": 0,
+      "n_labelled_auto_accept_correct": 0,
+      "verdicts": {
+        "fuzzy": 1,
+        "miss": 7,
+        "predicted_absent": 8
+      },
+      "auto_accept_coverage": 0.0,
+      "review_burden": 0.5,
+      "realized_error": null,
+      "accuracy_of_found": 0.125
+    }
+  }
+}

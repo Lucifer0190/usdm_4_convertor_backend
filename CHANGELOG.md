@@ -6,12 +6,25 @@ yet semantically versioned.
 
 ## [Unreleased]
 
-### Phase 4 in progress — Confidence + conformal (CP4-A)
+### Phase 4 complete — Confidence + conformal (v0.3.4, CP4-A–C)
 
-Ground-truth labels and multi-signal features — the inputs the Phase 4 confidence model
-and conformal threshold will train on.
+**Major milestone:** field-level confidence is no longer a hand-set formula. Frozen labels
+from 4 held-out usdm_data studies feed a typed scorer, a multi-signal feature table, a fitted
++ recalibrated confidence model, and a certified auto-accept threshold with an exact,
+small-sample statistical guarantee — plus a scoreboard reporting all of it. The eval labelled
+set (62 field labels) is far short of DESIGN.md §5's ~1,200-label target, so every number the
+scoreboard prints says so explicitly rather than posing as a general accuracy claim.
 
-Added:
+CP4-C (task 4.4):
+- `eval/report.py` / `usdm4 eval` — runs `run_full()` on every labelled corpus study, scores
+  it, and reports auto-accept coverage, review burden and realized error (DESIGN.md L6),
+  overall and per domain, to `eval_scoreboard.md`/`.json`.
+- `eval/corpus.py`'s PDF discovery is more general: a directory with no `<dir>.pdf` now falls
+  back to its one PDF every other PDF there is named after (`CDISC_Pilot_Study.pdf` +
+  `CDISC_Pilot_Study_CRF.pdf`), fixing a real corpus study the exact-name convention missed
+  entirely — task 4.4's first eval run surfaced this by failing to find it.
+
+CP4-A (tasks 4.1-4.2):
 - `eval/labels.py` — flattens a usdm_data USDM v4 wrapper JSON to frozen `FieldLabel`s at
   the same (domain, field) grain as `AssuredField`. Labels for the 4 real, USDM-v4 corpus
   studies (Alexion, CDISC Pilot, Eli Lilly NCT03421379, Sanofi) are committed at

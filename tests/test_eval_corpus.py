@@ -30,6 +30,24 @@ def test_source_pdf_matching_directory_name_is_found(tmp_path):
     assert found == [Study(study_id=d.name, pdf_path=d / f"{d.name}.pdf")]
 
 
+def test_single_non_derivative_pdf_is_found_without_exact_name_match(tmp_path):
+    # CDISC_Pilot's real shape: no "CDISC_Pilot.pdf", but exactly one non-derivative PDF.
+    d = tmp_path / "CDISC_Pilot"
+    d.mkdir()
+    (d / "CDISC_Pilot_Study.pdf").write_bytes(b"%PDF-1.4")
+    (d / "CDISC_Pilot_Study_CRF.pdf").write_bytes(b"%PDF-1.4")
+    found = studies(tmp_path)
+    assert found == [Study(study_id="CDISC_Pilot", pdf_path=d / "CDISC_Pilot_Study.pdf")]
+
+
+def test_multiple_non_derivative_pdfs_with_no_exact_match_is_ambiguous(tmp_path):
+    d = tmp_path / "Sponsor_NCT123_Cond"
+    d.mkdir()
+    (d / "protocol_v1.pdf").write_bytes(b"%PDF-1.4")
+    (d / "protocol_v2.pdf").write_bytes(b"%PDF-1.4")
+    assert studies(tmp_path) == []
+
+
 def test_results_are_sorted_by_study_id(tmp_path):
     for name in ["Zeta_NCT2", "Alpha_NCT1"]:
         d = tmp_path / name
