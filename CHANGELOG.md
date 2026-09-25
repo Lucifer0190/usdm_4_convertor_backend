@@ -6,6 +6,28 @@ yet semantically versioned.
 
 ## [Unreleased]
 
+### Phase 4 in progress — Confidence + conformal (CP4-A)
+
+Ground-truth labels and multi-signal features — the inputs the Phase 4 confidence model
+and conformal threshold will train on.
+
+Added:
+- `eval/labels.py` — flattens a usdm_data USDM v4 wrapper JSON to frozen `FieldLabel`s at
+  the same (domain, field) grain as `AssuredField`. Labels for the 4 real, USDM-v4 corpus
+  studies (Alexion, CDISC Pilot, Eli Lilly NCT03421379, Sanofi) are committed at
+  `data/labels/fields/*.jsonl`; `write_labels()` refuses to overwrite without `force=True`.
+  These 4 studies are held out from Phases 0-3's tuning.
+- `eval/score.py` — typed scorer: exact → normalized → fuzzy (token-overlap for prose
+  fields, numeric tolerance for ages; short scalar fields are not graded on a curve) → miss.
+  `summarize()` gives per-domain accuracy, including accuracy-of-found.
+- `assure/features.py` — one `FeatureRow` per `AssuredField`: verify_pass, verifier verdict,
+  exact + fuzzy cross-candidate agreement, field type, a retrieval proxy (evidence-window
+  kept ratio + route-plan hash), table-cell/grid-agreement flags, span length, page position,
+  and `has_text_layer` (a real deterministic signal, not an invented OCR classifier).
+  `write_features()` emits `features.parquet` (JSON Lines fallback without pandas/pyarrow).
+- `pipeline.FullResult.windows` — each domain's `EvidenceWindow`, exposed for `features.py`.
+- `eval` optional dependency group (`pandas`, `pyarrow`).
+
 ### Phase 3 complete — Routing, prohibited scopes, completeness (v0.3.3, CP3-A–C)
 
 **Major milestone:** every extraction domain now reads a section-graph-scoped view of the

@@ -85,6 +85,9 @@ class FullResult:
         assured_objectives: C4's fields after the Assurance layer.
         routed: The section graph + route plan (``None`` with routing off).
         findings: Scope findings from every domain's evidence window.
+        windows: ``{domain: EvidenceWindow}`` for metadata/design/eligibility/
+            objectives — the input ``assure.features`` needs for retrieval
+            signals (task 4.2).
     """
     assured_meta: list[AssuredField]
     design: object
@@ -98,6 +101,7 @@ class FullResult:
     assured_objectives: list[AssuredField] = field(default_factory=list)
     routed: object = None
     findings: list[Finding] = field(default_factory=list)
+    windows: dict = field(default_factory=dict)
 
 
 def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
@@ -194,7 +198,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
 
     return FullResult(assured_meta, design, grid, study, out_dir, elig, objs,
                       assured_design, assured_eligibility, assured_objectives,
-                      routed=routed, findings=findings)
+                      routed=routed, findings=findings, windows=win)
 
 
 @dataclass

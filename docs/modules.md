@@ -79,7 +79,8 @@ reasoning, then constrained JSON) emission — see DESIGN.md §3 L4.*
 | `extract/shards.py` | Shard definitions for two-pass LLM extraction: <40 fields per shard, organized by domain (C1–C4). Each shard has versioned `pass1.md` (reasoning) and `pass2.md` (JSON) templates. |
 | `llm/two_pass.py` | Two-pass extraction orchestrator: pass 1 free-text reasoning, pass 2 strict JSON `[{field, value, quote}]` with mandatory verbatim quotes. `extract_shard()` returns `GroundedCandidate`s with resolved quotes. |
 | `audit/writer.py` | Pipeline integration for audit logging: `write_field_decision()` appends one `AuditRecord` per `AssuredField`, pulling model/prompt/quote provenance from the winning grounded candidate. |
-| `assure/confidence.py` *(planned, Phase 4)* | Multi-signal fitted confidence model (grounding outcome, entailment, cross-model agreement, field type, retrieval score) replacing the current hand-set formula. |
+| `assure/features.py` | Multi-signal feature table (task 4.2) feeding the Phase 4 confidence model: verify_pass, verifier verdict, exact + fuzzy cross-candidate agreement, field type, a retrieval proxy (evidence-window kept ratio + route-plan hash), table-cell/grid-agreement flags (SoA), span length, page position, and `has_text_layer` — a real, deterministic "would OCR have been needed" signal (no OCR detector exists, so this is not dressed up as one). `write_features()` emits `features.parquet` (JSON Lines fallback without `pandas`/`pyarrow`). |
+| `assure/confidence.py` *(planned, Phase 4)* | Multi-signal fitted confidence model over `assure/features.py`'s table, replacing the current hand-set formula. |
 | `assure/conformal.py` *(planned, Phase 4)* | Split-conformal threshold with small-sample correction — a provable, marginal bound on error among auto-accepted fields. |
 | `assure/completeness.py` | Expected-vs-found reconciliation per domain: arm count vs. randomization ratio, arms×epochs cell coverage in the assembled study, SoA schedule-link integrity, protocol-text visit references vs. SoA columns, footnote markers vs. definitions, objective/endpoint pairing, eligibility list presence. A mismatch is a `COMPLETENESS` finding (`ERROR` demotes that domain's `auto_accept` fields to `review` via `demote_on_error()`); a rule with nothing to compare against stays quiet. |
 
@@ -131,7 +132,9 @@ Phase-0/1 scope, and are not represented as empty packages in the tree.
 | Module | Role |
 |---|---|
 | `eval/corpus.py` | usdm_data protocol-PDF loader (`spikes/_work/usdm_data`, gitignored): one `Study(study_id, pdf_path)` per directory whose source PDF matches the directory name (excludes `_USDM`/`_CRF`/`_SoA` derivatives). |
-| `eval/run.py` | Phase 3 exit measurement: runs `run_full()` with routing on and off per study and diffs `AssuredField`s (value + decision) domain-by-field, writing `summary.md`/`summary.json` and a per-study diff. No ground truth yet — Phase 4 (task 4.1) adds frozen labels and a real scorer; until then this reports routing-on-vs-off disagreement and scope-finding counts. |
+| `eval/run.py` | Phase 3 exit measurement: runs `run_full()` with routing on and off per study and diffs `AssuredField`s (value + decision) domain-by-field, writing `summary.md`/`summary.json` and a per-study diff. |
+| `eval/labels.py` | Frozen ground truth (task 4.1): flattens a usdm_data USDM v4 wrapper JSON to one `FieldLabel` per (domain, field) at the same grain as `AssuredField`. Only 4 real corpus studies are both USDM v4 and non-synthetic (Alexion, CDISC Pilot, Eli Lilly NCT03421379, Sanofi); their labels live in `data/labels/fields/*.jsonl`, frozen and held out from earlier phases' tuning. `write_labels()` refuses to overwrite without `force=True`. |
+| `eval/score.py` | Typed scorer: `exact` → `normalized` → `fuzzy` (token-overlap for `long_text`, numeric tolerance for `number`; `scalar` fields are not graded on a curve — a near-miss scalar is a `miss`) → `miss`. `summarize()` gives per-domain accuracy including accuracy-of-found (excludes fields the pipeline didn't even attempt). |
 
 ## Orchestration & CLI
 
