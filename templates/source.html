@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>USDM4-Assure — review {{ source_sha256[:12] }}</title>
+  <!-- Pinned + SRI-verified: sha384 computed locally from the exact file at this
+       URL (unpkg.com/htmx.org@2.0.4/dist/htmx.min.js), not copied from a third party. -->
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
+          integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
+          crossorigin="anonymous"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 0.4rem 0.8rem; border-bottom: 1px solid #ddd; vertical-align: top; }
+    th { background: #f5f5f5; }
+    .decision-block { color: #b00020; font-weight: 600; }
+    .decision-review { color: #a05a00; font-weight: 600; }
+    .decision-auto_accept { color: #0a7a0a; }
+    .confidence-low { background: #fff3f0; }
+    form.edit-form { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; }
+    form.edit-form input, form.edit-form textarea { font: inherit; padding: 0.2rem; }
+    .crop-img { max-width: 480px; border: 1px solid #ccc; margin-top: 0.4rem; }
+    .history-list { font-size: 0.85rem; margin: 0.4rem 0 0 0; padding-left: 1.2rem; }
+    .certify-box { background: #f0f6ff; border: 1px solid #cddcf5; padding: 1rem; margin-bottom: 1.5rem; }
+    .toolbar { display: flex; gap: 0.6rem; margin-bottom: 0.4rem; }
+    button { cursor: pointer; }
+    a.back { color: #0b5fff; }
+  </style>
+</head>
+<body>
+  <p><a class="back" href="/">&larr; all sources</a></p>
+  <h1>{{ summary.pdf_path or source_sha256 }}</h1>
+  <p>sha256 <code>{{ source_sha256 }}</code> &middot; {{ summary.n_fields }} fields &middot;
+     {{ summary.run_ids|length }} run(s)</p>
+
+  <div class="certify-box" id="certify-box">
+    {% if summary.certified %}
+      <strong>Certified.</strong>
+    {% else %}
+      <form hx-post="/source/{{ source_sha256 }}/certify" hx-target="#certify-box" hx-swap="innerHTML">
+        <label>Reviewer id <input name="reviewer_id" required></label>
+        <label>Signature meaning
+          <input name="signature_meaning" value="Reviewed and approved for submission" required>
+        </label>
+        <button type="submit">Certify this run</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Domain</th><th>Field</th><th>Value</th><th>Decision</th><th>Confidence</th>
+        <th>Verify</th><th>Source</th><th>Edit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      {% include "_row_inner.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

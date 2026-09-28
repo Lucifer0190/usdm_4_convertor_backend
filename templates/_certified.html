@@ -1,0 +1,8 @@
+<strong>Certified</strong> by {{ row.reviewer_id }} at {{ row.timestamp_utc }} —
+"{{ row.signature_meaning }}"
+<div style="font-size: 0.85rem; margin-top: 0.3rem;">
+  {{ summary.n_edited }} of {{ summary.n_fields }} field(s) edited before certification.
+  {% if summary.mean_distance_of_edited is not none %}
+  Mean post-edit distance (edited fields): {{ '%.2f'|format(summary.mean_distance_of_edited) }}.
+  {% endif %}
+</div>

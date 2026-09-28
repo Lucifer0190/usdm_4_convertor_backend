@@ -1,0 +1,14 @@
+<ol class="history-list">
+  {% for rec in history %}
+  <li>
+    <strong>{{ rec.event.value }}</strong>
+    {{ rec.timestamp_utc }}
+    &mdash; value: {{ rec.value if rec.value is not none else '—' }}
+    {% if rec.prior_value is not none %}(was: {{ rec.prior_value }}){% endif %}
+    {% if rec.method %} &middot; method: {{ rec.method.value }}{% endif %}
+    {% if rec.decision %} &middot; decision: {{ rec.decision.value }}{% endif %}
+    {% if rec.reviewer_id %} &middot; reviewer: {{ rec.reviewer_id }}{% endif %}
+    {% if rec.reason_for_change %} &middot; reason: {{ rec.reason_for_change }}{% endif %}
+  </li>
+  {% endfor %}
+</ol>

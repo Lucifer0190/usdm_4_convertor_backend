@@ -10,8 +10,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from usdm4_assure.audit.store import AuditStore
-from usdm4_assure.contracts import AssuredField, GroundedCandidate
+from usdm4_assure.contracts import AssuredField, Decision, GroundedCandidate, Method
 from usdm4_assure.contracts_audit import AuditEvent, AuditRecord
+
+# A reviewer edit or certification applies across every domain, not one —
+# AuditRecord.domain has no default, so this documents what a wildcard means
+# rather than overloading a real domain name like "metadata".
+ALL_DOMAINS = "*"
 
 if TYPE_CHECKING:
     from usdm4_assure.assure.conformal import ConformalBound
@@ -111,5 +116,41 @@ def write_calibration(store: AuditStore, *, run_id: str, source_sha256: str,
         run_id=run_id, event=AuditEvent.CALIBRATION, source_sha256=source_sha256,
         domain="assure", field=None, pipeline_version=pipeline_version,
         threshold=bound.threshold, verification=verification)
+    store.append(record)
+    return record
+
+
+def write_review_edit(store: AuditStore, *, run_id: str, source_sha256: str, domain: str,
+                      field: str, value: str, prior_value: str | None,
+                      reviewer_id: str, reason_for_change: str) -> AuditRecord:
+    """Append the record of a reviewer changing (or confirming) one field's value.
+
+    A human explicitly supplying a value is, by definition, an accepted one —
+    ``decision`` is always ``AUTO_ACCEPT`` and ``method`` is ``HUMAN``, at
+    ``confidence=1.0`` (a human decision is not a probabilistic score). The
+    prior value is whatever the reviewer saw on screen when they edited it —
+    the caller (the review UI) is responsible for passing the *current* value,
+    not necessarily the original extraction's.
+    """
+    record = AuditRecord(
+        run_id=run_id, event=AuditEvent.REVIEW_EDIT, source_sha256=source_sha256,
+        domain=domain, field=field, value=value, method=Method.HUMAN,
+        decision=Decision.AUTO_ACCEPT, confidence=1.0, reviewer_id=reviewer_id,
+        prior_value=prior_value, reason_for_change=reason_for_change)
+    store.append(record)
+    return record
+
+
+def write_certification(store: AuditStore, *, run_id: str, source_sha256: str,
+                        reviewer_id: str, signature_meaning: str) -> AuditRecord:
+    """Append the record of a reviewer signing off the run.
+
+    One record, ``domain=ALL_DOMAINS`` — certification is a statement about
+    the whole run's field set, not one field.
+    """
+    record = AuditRecord(
+        run_id=run_id, event=AuditEvent.CERTIFY, source_sha256=source_sha256,
+        domain=ALL_DOMAINS, field=None, reviewer_id=reviewer_id,
+        signature_meaning=signature_meaning)
     store.append(record)
     return record

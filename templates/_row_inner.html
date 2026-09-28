@@ -1,0 +1,35 @@
+<tr id="row-{{ row.domain }}-{{ row.field }}"
+    class="{{ 'confidence-low' if row.confidence is not none and row.confidence < 0.5 else '' }}">
+  <td>{{ row.domain }}</td>
+  <td>{{ row.field }}</td>
+  <td>{{ row.value if row.value is not none else '—' }}</td>
+  <td class="decision-{{ row.decision.value if row.decision else 'none' }}">
+    {{ row.decision.value if row.decision else '—' }}
+  </td>
+  <td>{{ '%.2f'|format(row.confidence) if row.confidence is not none else '—' }}</td>
+  <td>{{ row.verify_pass.value if row.verify_pass else '—' }}</td>
+  <td>
+    {% if row.page and row.bbox %}
+    <details>
+      <summary>p.{{ row.page }}</summary>
+      <img class="crop-img" loading="lazy"
+           src="/source/{{ source_sha256 }}/crop?page={{ row.page }}&x0={{ row.bbox[0] }}&y0={{ row.bbox[1] }}&x1={{ row.bbox[2] }}&y1={{ row.bbox[3] }}"
+           alt="source crop, page {{ row.page }}">
+    </details>
+    {% else %}—{% endif %}
+    <div>
+      <button type="button" hx-get="/source/{{ source_sha256 }}/history/{{ row.domain }}/{{ row.field }}"
+              hx-target="#history-{{ row.domain }}-{{ row.field }}" hx-swap="innerHTML">History</button>
+      <div id="history-{{ row.domain }}-{{ row.field }}"></div>
+    </div>
+  </td>
+  <td>
+    <form class="edit-form" hx-post="/source/{{ source_sha256 }}/fields/{{ row.domain }}/{{ row.field }}/edit"
+          hx-target="#row-{{ row.domain }}-{{ row.field }}" hx-swap="outerHTML">
+      <input name="value" value="{{ row.value if row.value is not none else '' }}" required>
+      <textarea name="reason" placeholder="reason for change" rows="2" required></textarea>
+      <input name="reviewer_id" placeholder="reviewer id" required>
+      <button type="submit">Save</button>
+    </form>
+  </td>
+</tr>

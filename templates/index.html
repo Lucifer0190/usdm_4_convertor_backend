@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>USDM4-Assure — review</title>
+  <!-- Pinned + SRI-verified: sha384 computed locally from the exact file at this
+       URL (unpkg.com/htmx.org@2.0.4/dist/htmx.min.js), not copied from a third party. -->
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
+          integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
+          crossorigin="anonymous"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 0.4rem 0.8rem; border-bottom: 1px solid #ddd; }
+    th { background: #f5f5f5; }
+    .certified { color: #0a7a0a; font-weight: 600; }
+    .uncertified { color: #888; }
+    a { color: #0b5fff; }
+  </style>
+</head>
+<body>
+  <h1>USDM4-Assure — review</h1>
+  <p>{{ sources|length }} source PDF{{ '' if sources|length == 1 else 's' }} with audit history.</p>
+
+  {% if not sources %}
+  <p><em>No runs found. Run <code>usdm4 convert-full &lt;pdf&gt;</code> first —
+     every run writes its field decisions here.</em></p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>Source</th><th>Fields</th><th>Auto-accept</th><th>Review</th><th>Block</th>
+        <th>Runs</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sources %}
+      <tr>
+        <td><a href="/source/{{ s.source_sha256 }}">{{ (s.pdf_path or s.source_sha256[:12]) }}</a></td>
+        <td>{{ s.n_fields }}</td>
+        <td>{{ s.decision_summary.auto_accept }}</td>
+        <td>{{ s.decision_summary.review }}</td>
+        <td>{{ s.decision_summary.block }}</td>
+        <td>{{ s.run_ids|length }}</td>
+        <td class="{{ 'certified' if s.certified else 'uncertified' }}">
+          {{ 'certified' if s.certified else 'not certified' }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</body>
+</html>

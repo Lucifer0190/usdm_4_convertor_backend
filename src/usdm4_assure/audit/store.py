@@ -9,11 +9,12 @@ against the database file fails loudly instead of silently rewriting history.
 """
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from pathlib import Path
 
-from usdm4_assure.contracts_audit import AuditRecord
+from usdm4_assure.contracts_audit import AuditRecord, utc_now
 
 _DEFAULT_DIR = Path("data/audit")
 
@@ -52,6 +53,12 @@ END;
 """
 
 
+def audit_dir(base_dir: str | Path | None = None) -> Path:
+    """The directory audit databases live in: ``base_dir``, else ``USDM4_AUDIT_DIR``,
+    else ``data/audit``. Shared by :func:`audit_path` and the review UI's source list."""
+    return Path(base_dir or os.environ.get("USDM4_AUDIT_DIR", _DEFAULT_DIR))
+
+
 def audit_path(source_sha256: str, base_dir: str | Path | None = None) -> Path:
     """The conventional path for a source PDF's audit database.
 
@@ -60,8 +67,38 @@ def audit_path(source_sha256: str, base_dir: str | Path | None = None) -> Path:
         base_dir: Override the directory. Defaults to ``data/audit`` or
             ``USDM4_AUDIT_DIR`` if set.
     """
-    base = Path(base_dir or os.environ.get("USDM4_AUDIT_DIR", _DEFAULT_DIR))
-    return base / f"{source_sha256}.sqlite"
+    return audit_dir(base_dir) / f"{source_sha256}.sqlite"
+
+
+def _source_pointer_path(source_sha256: str, base_dir: str | Path | None = None) -> Path:
+    return audit_path(source_sha256, base_dir).with_suffix(".source.json")
+
+
+def record_source(source_sha256: str, pdf_path: str | Path,
+                  base_dir: str | Path | None = None) -> Path:
+    """Remember which PDF a ``source_sha256`` audit database belongs to.
+
+    The sqlite rows carry no filesystem path (an audit record documents a
+    decision, not where the bytes live), but the review UI needs one to render
+    a click-to-source crop. First write wins — the path a source was *first*
+    audited under is what stays on record, even if a later run reads the same
+    PDF from a different location.
+    """
+    path = _source_pointer_path(source_sha256, base_dir)
+    if path.exists():
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"pdf_path": str(pdf_path), "recorded_at": utc_now()}, indent=2),
+                    encoding="utf-8")
+    return path
+
+
+def read_source_pointer(source_sha256: str, base_dir: str | Path | None = None) -> dict | None:
+    """The ``{"pdf_path", "recorded_at"}`` written by :func:`record_source`, or ``None``."""
+    path = _source_pointer_path(source_sha256, base_dir)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 class AuditStore:

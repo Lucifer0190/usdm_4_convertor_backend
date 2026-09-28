@@ -13,13 +13,17 @@ rewrite. See ``docs/pipeline.md`` for the data-flow contracts.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from usdm4_assure.assemble.metadata import assemble_metadata
 from usdm4_assure.assure import assure
 from usdm4_assure.assure.completeness import account, demote_on_error
+from usdm4_assure.audit.store import AuditStore, record_source
+from usdm4_assure.audit.writer import write_run
 from usdm4_assure.contracts import AssuredField, Decision, FieldCandidate, Finding
 from usdm4_assure.extract import metadata as c1
 from usdm4_assure.extract.design import DESIGN_FIELDS
@@ -31,6 +35,13 @@ from usdm4_assure.ingest.pdf import ingest
 from usdm4_assure.llm.router import get_llm
 from usdm4_assure.sections.plan import build_plan
 from usdm4_assure.validate.gate import validate_wrapper
+
+
+def _sha256_file(path: str | Path) -> str:
+    """Hex sha256 of a file's bytes — the audit store's identity for a source PDF."""
+    h = hashlib.sha256()
+    h.update(Path(path).read_bytes())
+    return h.hexdigest()
 
 
 def _eligibility_candidates(e: EligibilityExtract) -> list[FieldCandidate]:
@@ -88,6 +99,9 @@ class FullResult:
         windows: ``{domain: EvidenceWindow}`` for metadata/design/eligibility/
             objectives — the input ``assure.features`` needs for retrieval
             signals (task 4.2).
+        source_sha256: The source PDF's sha256 — the audit store's key, and
+            what the review UI (task 5.1) looks a run up by.
+        run_id: This run's id in the audit store.
     """
     assured_meta: list[AssuredField]
     design: object
@@ -102,6 +116,8 @@ class FullResult:
     routed: object = None
     findings: list[Finding] = field(default_factory=list)
     windows: dict = field(default_factory=dict)
+    source_sha256: str = ""
+    run_id: str = ""
 
 
 def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
@@ -179,6 +195,22 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
                    wrapper=study.get("wrapper"), evidence_text=design_doc.full_text)
     findings += gaps
     demote_on_error(all_assured, gaps)
+
+    # Part 11 audit trail (DESIGN.md L9): one AuditRecord per final field decision,
+    # written after completeness may have demoted a decision, so the trail matches
+    # what review.json reports. record_source() is what lets the review UI (Phase 5)
+    # find this PDF again from just its sha256.
+    source_sha256 = _sha256_file(pdf_path)
+    run_id = uuid.uuid4().hex
+    record_source(source_sha256, pdf_path)
+    audit_store = AuditStore(source_sha256=source_sha256)
+    for domain, fields_ in (("metadata", assured_meta), ("design", assured_design),
+                            ("eligibility", assured_eligibility),
+                            ("objectives", assured_objectives)):
+        write_run(audit_store, run_id=run_id, source_sha256=source_sha256, domain=domain,
+                 assured_fields=fields_, retrieval_config=win[domain].retrieval_config())
+    audit_store.close()
+
     review = {
         "source": str(pdf_path),
         "decision_summary": {d.value: 0 for d in Decision},
@@ -198,7 +230,8 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
 
     return FullResult(assured_meta, design, grid, study, out_dir, elig, objs,
                       assured_design, assured_eligibility, assured_objectives,
-                      routed=routed, findings=findings, windows=win)
+                      routed=routed, findings=findings, windows=win,
+                      source_sha256=source_sha256, run_id=run_id)
 
 
 @dataclass
