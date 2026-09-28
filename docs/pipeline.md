@@ -2,11 +2,13 @@
 
 > **v0.3 note.** This page describes the ten-layer pipeline (see
 > [Architecture](architecture.md)). The implementation is being built in the phases
-> described in [`../PLAN.md`](../PLAN.md). As of Phase 4 (CP4-C, 2026-09-25), the
+> described in [`../PLAN.md`](../PLAN.md). As of Phase 5 (CP5-A, 2026-09-28), the
 > implemented layers are L0 (ingest), L1–L2 (layout + multi-page SoA stitching), L3
 > (routing), L4 (sharded extraction), L5 (grounding), L6 (assurance + completeness +
-> calibrated confidence/conformal), L7 (assembly), and L8 (validation). L9 is scheduled
-> for Phase 5. **Not yet wired into `run_full()`:** the Phase 4 confidence model and
+> calibrated confidence/conformal), L7 (assembly), L8 (validation), and L9
+> (certification: `run_full()` now writes the Part 11 audit trail every field decision
+> was already designed for, and `review/app.py` reads it — see `docs/review.md`).
+> **Not yet wired into `run_full()`'s triage:** the Phase 4 confidence model and
 > conformal threshold exist and are tested (`assure/confidence.py`, `assure/conformal.py`,
 > `usdm4 eval`), but `assure()`'s triage still uses the original hand-set formula — there
 > are not yet enough frozen labels (62, vs. DESIGN.md §5's ~1,200 target) to fit and

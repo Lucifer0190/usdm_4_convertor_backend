@@ -9,7 +9,9 @@ the target v0.3 layout from [`../DESIGN.md`](../DESIGN.md) §6 — planned modul
 > layer map visible in the tree. The evidence review flagged this as a real risk — it made
 > the design doc look more built than the code was. Going forward, **a package is only
 > created once it has real code**; this page lists planned modules by name and target
-> location instead, and CI now fails on empty packages.
+> location instead, and CI now fails on empty packages. `eval/` (Phase 3-4) and `review/`
+> (Phase 5, CP5-A) have since earned real packages under this rule; `registry/`, `coding/`,
+> `learn/`, `graph/` and `retrieve/` remain names only.
 
 ## L0 — Substrate
 
@@ -102,12 +104,16 @@ reasoning, then constrained JSON) emission — see DESIGN.md §3 L4.*
 | `validate/rule_map.py` *(planned)* | Declarative `rule_id → (domain, field, repair action)` table bridging validation findings to targeted re-extraction. |
 | `repair/loop.py` *(planned)* | Bounded (≤2 round) repair loop driven by `rule_map.py`; unresolved findings become `review`/`block`, never silently dropped. |
 
-## L9 — Certification *(planned, v0.3 Phase 5)*
+## L9 — Certification *(v0.3 Phase 5, CP5-A)*
 
 | Module | Role |
 |---|---|
-| `review/` | Provenance review UI — click-to-source evidence crops, SME sign-off. |
-| `review/audit.py` | Part 11 audit trail: model+prompt version, timestamps, prior values, reason-for-change, signature meaning, per field. |
+| `review/app.py` | FastAPI + Jinja2 + HTMX review UI (`templates/`): list runs, a field table sorted worst-first (`block` → `review` → `auto_accept`, confidence ascending), click-to-source crops, edits, certification. Localhost only, no auth — see `docs/review.md`. |
+| `review/data.py` | Read-side queries over the audit store: a field's *current* value is simply the latest record for its `(domain, field)` key, whatever event wrote it — no separate "current" table to keep in sync. |
+| `review/crops.py` | Renders a PNG crop of a quote's exact bbox from the source PDF (PyMuPDF), on request — nothing pre-rendered or cached. |
+| `review/telemetry.py` | Post-edit-distance (task 5.2): normalized character edit distance between a field's original extraction and its value as of certification. Exports edited fields as new labels to `data/labels/edits/` — real signal, but explicitly not the frozen `data/labels/fields/` ground truth (task 4.1). |
+| `audit/writer.py` | `write_review_edit()` / `write_certification()` append the reviewer-facing `AuditRecord`s (`REVIEW_EDIT`, `CERTIFY`); every write is a new row, nothing is ever updated. |
+| `audit/store.py` | `record_source()` / `read_source_pointer()` remember which PDF a `source_sha256` audit database belongs to, so the review UI can render crops from just the sha256 the store is keyed on. |
 
 ## Model orchestration
 

@@ -6,6 +6,40 @@ yet semantically versioned.
 
 ## [Unreleased]
 
+### Phase 5 in progress — Review UI + certification (v0.3.5, CP5-A)
+
+**Major milestone:** `run_full()` now writes a Part 11 audit trail — every field decision
+was already designed for this (`contracts_audit.AuditRecord`, `audit/store.py`'s append-only
+SQLite store, both built in Phase 1) but nothing had actually called them until now. An HTMX
+review UI reads that trail: a reviewer sees every field sorted worst-first, expands a
+click-to-source crop rendered straight from the PDF, edits a value with a required reason, and
+certifies the run — every action a new, non-destructive audit record, never an overwrite.
+
+Added:
+- `pipeline.run_full()` writes one `AuditRecord` per final field decision (after completeness
+  may have demoted one) to a per-source-PDF SQLite store, and records a `(sha256 -> pdf_path)`
+  pointer (`audit.record_source()`) so later tools can find the PDF again from just its hash.
+  `FullResult` now carries `source_sha256` and `run_id`.
+- `audit.write_review_edit()` / `write_certification()` — new `AuditRecord` kinds for a
+  reviewer's edit (`REVIEW_EDIT`, `method=HUMAN`, `decision=AUTO_ACCEPT`, prior value + reason)
+  and a certification (`CERTIFY`, reviewer id + signature meaning). New `AuditEvent.CALIBRATION`
+  sibling `AuditEvent.CERTIFY` was already defined; this is what writes it in practice.
+- `review/app.py` — FastAPI + Jinja2 + HTMX UI (`templates/`): home page lists every source
+  with audit history; source page lists current field values (the latest record per
+  `(domain, field)`, whatever wrote it) sorted `block` → `review` → `auto_accept`, confidence
+  ascending; click-to-source crops (`review/crops.py`, PyMuPDF, rendered on request); an edit
+  form and a certify button, both HTMX partial-swapped. Localhost only, no auth — `docs/review.md`
+  states why that is a scoped, deliberate decision.
+- `review/telemetry.py` (task 5.2) — post-edit distance: normalized character edit distance
+  between a field's original extraction and its value as of certification. Edited fields'
+  certified values export to `data/labels/edits/<study>.jsonl` — real signal, but never the
+  frozen `data/labels/fields/` ground truth (task 4.1); this directory is explicitly
+  regenerable, not frozen.
+- `docker-compose.yml` gains a `review` service (`--profile review`); the placeholder `neo4j`
+  service is removed (PLAN.md's Phase-2+ deferrals — it was never scheduled, only parked).
+- `docs/review.md`; new optional dependency group `review` (fastapi, uvicorn, jinja2,
+  python-multipart); `httpx` added to `dev` for `fastapi.testclient`.
+
 ### Phase 4 complete — Confidence + conformal (v0.3.4, CP4-A–C)
 
 **Major milestone:** field-level confidence is no longer a hand-set formula. Frozen labels

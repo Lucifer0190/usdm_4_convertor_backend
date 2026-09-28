@@ -10,8 +10,6 @@ services:
       - ./src:/app/src            # live code during dev
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-    depends_on:
-      - neo4j
 
   # CORE conformance engine — pinned separately; run as a one-shot validation gate.
   # Placeholder: the spike wires cdisc-rules-engine here once the CLI invocation is proven.
@@ -23,12 +21,27 @@ services:
     command: ["sleep", "infinity"]   # replaced by CORE engine invocation in spike step 2
     profiles: ["validate"]
 
-  # Data layer (Phase 2) — property graph for downstream automation. Placeholder now.
-  neo4j:
-    image: neo4j:5-community
-    environment:
-      - NEO4J_AUTH=neo4j/usdm4assure
+  # Certification review UI (Phase 5, task 5.3) — click-to-source crops, audited edits,
+  # certification. Localhost only, no auth (docs/review.md). Reuses the app image; the
+  # [review] extra (fastapi/uvicorn/jinja2) is dev-installed at start, same as `app`'s
+  # live-mounted src, so a rebuild isn't needed while iterating on the UI.
+  review:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: usdm4-assure:dev
+    entrypoint: []
+    command: >
+      sh -c "pip install --no-cache-dir -e .[review] &&
+             uvicorn usdm4_assure.review.app:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - ./data:/app/data          # audit stores + source PDFs
+      - ./src:/app/src            # live code during dev
+      - ./templates:/app/templates
     ports:
-      - "7474:7474"
-      - "7687:7687"
-    profiles: ["graph"]
+      - "8000:8000"
+    profiles: ["review"]
+
+# Neo4j (property-graph data layer) was parked here in earlier iterations. It is
+# deliberately not scheduled — see PLAN.md's Phase-2+ deferrals — and is not
+# represented as a service; add it back only when a phase actually calls for it.

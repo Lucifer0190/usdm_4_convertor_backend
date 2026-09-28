@@ -64,6 +64,8 @@ uses independent deterministic methods, and an LLM member joins automatically vi
 - **[Module reference](modules.md)** — what every package does, current and planned.
 - **[Conformance & limitations](conformance.md)** — the validation gates, current results,
   and the honest analysis of what's gated by the upstream assembler.
+- **[Review UI](review.md)** — the HTMX certification tool: click-to-source crops, audited
+  edits, post-edit-distance telemetry.
 - **[Development](development.md)** — setup, testing, and environment gotchas.
 - **[References](references.md)** — standards, tools, and prior art, with the accuracy
   claims each source actually supports.
