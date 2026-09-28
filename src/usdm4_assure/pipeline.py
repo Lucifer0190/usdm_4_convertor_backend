@@ -24,18 +24,16 @@ from usdm4_assure.assure import assure
 from usdm4_assure.assure.completeness import account, demote_on_error
 from usdm4_assure.audit.store import AuditStore, record_source
 from usdm4_assure.audit.writer import write_run
-from usdm4_assure.contracts import AssuredField, Decision, FieldCandidate, Finding
+from usdm4_assure.contracts import AssuredField, Decision, Finding
 from usdm4_assure.extract import metadata as c1
-from usdm4_assure.extract.design import DESIGN_FIELDS
-from usdm4_assure.extract.eligibility import EligibilityExtract
+from usdm4_assure.extract.domains import extract_domain
 from usdm4_assure.extract.estimands import estimand_evidence, extract_estimands
-from usdm4_assure.extract.objectives import ObjectivesExtract
-from usdm4_assure.extract.shards import ELIGIBILITY_FIELDS, OBJECTIVES_FIELDS
 from usdm4_assure.extract.windows import window_for
 from usdm4_assure.ingest.pdf import ingest
 from usdm4_assure.llm.router import get_llm, get_role_llm
 from usdm4_assure.sections.plan import build_plan
 from usdm4_assure.validate.gate import validate_wrapper
+from usdm4_assure.validate.repair import repair_loop
 
 
 def _sha256_file(path: str | Path) -> str:
@@ -45,38 +43,11 @@ def _sha256_file(path: str | Path) -> str:
     return h.hexdigest()
 
 
-def _eligibility_candidates(e: EligibilityExtract) -> list[FieldCandidate]:
-    """Bridge the C3 deterministic extract into field-level candidates for
-    :func:`assure`, so eligibility drops its own ad hoc confidence/decision
-    in favor of the one uniform assurance path (DESIGN.md L6)."""
-    cands: list[FieldCandidate] = []
-    if e.inclusion:
-        text = " ".join(e.inclusion)
-        cands.append(FieldCandidate("inclusionCriteria", text, "region-parser", text))
-    if e.exclusion:
-        text = " ".join(e.exclusion)
-        cands.append(FieldCandidate("exclusionCriteria", text, "region-parser", text))
-    if e.age_min is not None:
-        v = str(e.age_min)
-        cands.append(FieldCandidate("plannedMinimumAge", v, "region-parser", v))
-    if e.age_max is not None:
-        v = str(e.age_max)
-        cands.append(FieldCandidate("plannedMaximumAge", v, "region-parser", v))
-    cands.append(FieldCandidate("plannedSex", e.sex, "region-parser", e.sex))
-    return cands
-
-
-def _objectives_candidates(o: ObjectivesExtract) -> list[FieldCandidate]:
-    """Bridge the C4 deterministic extract into field-level candidates for
-    :func:`assure` (see :func:`_eligibility_candidates`)."""
-    cands: list[FieldCandidate] = []
-    for item in o.items:
-        obj_field = "primaryObjective" if item.level == "Primary" else "secondaryObjective"
-        cands.append(FieldCandidate(obj_field, item.objective, "label-parser", item.objective))
-        if item.endpoint:
-            end_field = "primaryEndpoint" if item.level == "Primary" else "secondaryEndpoint"
-            cands.append(FieldCandidate(end_field, item.endpoint, "label-parser", item.endpoint))
-    return cands
+def _failed_rules(study: dict) -> list[str]:
+    """Rule ids that failed any rule gate that ran (d4k, and CORE when enabled)."""
+    validation = study.get("validation") or {}
+    return sorted({r for gate in ("d4k", "core")
+                   for r in ((validation.get(gate) or {}).get("failed_rules") or [])})
 
 
 @dataclass
@@ -106,6 +77,7 @@ class FullResult:
         estimands: The reconciled ``EstimandsExtract`` (C5, task 6.1).
         amendment_diff: The section-level ``AmendmentDiff`` against
             ``previous_version`` (task 6.2), or ``None``.
+        repair: The bounded repair loop's ``RepairOutcome`` (task 6.3).
     """
     assured_meta: list[AssuredField]
     design: object
@@ -124,6 +96,7 @@ class FullResult:
     run_id: str = ""
     estimands: object = None
     amendment_diff: object = None
+    repair: object = None
 
 
 def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
@@ -156,9 +129,6 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         its validation report, and the output directory.
     """
     from usdm4_assure.assemble.study import build_full_study
-    from usdm4_assure.extract.design import extract_design
-    from usdm4_assure.extract.eligibility import extract_eligibility
-    from usdm4_assure.extract.objectives import extract_objectives
     from usdm4_assure.extract.soa.crossval import cross_validate
     from usdm4_assure.extract.soa.methods import (
         extract_pdfplumber,
@@ -176,21 +146,10 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
            for d in ("metadata", "design", "eligibility", "objectives", "estimands")}
     findings = [f for w in win.values() for f in w.findings]
 
-    meta_doc = win["metadata"].document
-    assured_meta = assure(c1.extract_all(meta_doc, members), meta_doc, c1.FIELDS,
-                          domain="metadata")
-    meta = {a.field: a.value for a in assured_meta if a.value}
-    design_doc = win["design"].document
-    design_cands, design = extract_design(design_doc, meta, members[0])
-    assured_design = assure(design_cands, design_doc, DESIGN_FIELDS, domain="design")
-    elig_doc = win["eligibility"].document
-    elig = extract_eligibility(elig_doc)
-    assured_eligibility = assure(_eligibility_candidates(elig), elig_doc, ELIGIBILITY_FIELDS,
-                                 domain="eligibility")
-    obj_doc = win["objectives"].document
-    objs = extract_objectives(obj_doc)
-    assured_objectives = assure(_objectives_candidates(objs), obj_doc, OBJECTIVES_FIELDS,
-                                domain="objectives")
+    state = {"metadata": extract_domain("metadata", win["metadata"].document, members)}
+    meta = state["metadata"].values()
+    for domain in ("design", "eligibility", "objectives"):
+        state[domain] = extract_domain(domain, win[domain].document, members, meta)
     # C5 estimands (task 6.1): the hard_reasoning role plus a different-family
     # extract_alt member on top of the deterministic parser.
     estimands = extract_estimands(
@@ -217,18 +176,40 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
             identifier=amendment_identifier or meta.get("studyVersionIdentifier") or "1")
         findings += amendment_diff.findings + amendment_findings
 
-    study = build_full_study(assured_meta, design, grid, elig, objs, run_core=run_core,
-                             estimands=estimands, amendments=amendments_data)
-    findings += study.get("findings", [])
+    def build(st: dict) -> dict:
+        return build_full_study(st["metadata"].fields, st["design"].extract, grid,
+                                st["eligibility"].extract, st["objectives"].extract,
+                                run_core=run_core, estimands=estimands,
+                                amendments=amendments_data)
+
+    def revalidate(st: dict) -> list[str]:
+        nonlocal study
+        study = build(st)
+        return _failed_rules(study)
+
+    def reextract(domain: str, rnd: int):
+        # Round 1 widens the evidence to the unrouted document (routing may have
+        # filtered it); round 2 also adds the hard_reasoning member.
+        return extract_domain(domain, doc, members, state["metadata"].values(),
+                              escalate=get_role_llm("hard_reasoning") if rnd > 1 else None)
+
+    # Bounded repair loop (task 6.3, DESIGN.md L8): validate -> re-extract -> re-validate.
+    study = build(state)
+    repair = repair_loop(_failed_rules(study), state, reextract=reextract,
+                         revalidate=revalidate)
+    findings += study.get("findings", []) + repair.findings
     if study.get("wrapper"):
         (out_dir / "study.usdm.json").write_text(
             json.dumps(study["wrapper"], indent=2, default=str), encoding="utf-8")
 
+    assured_meta, assured_design, assured_eligibility, assured_objectives = (
+        state[d].fields for d in ("metadata", "design", "eligibility", "objectives"))
+    design, elig, objs = (state[d].extract for d in ("design", "eligibility", "objectives"))
     all_assured = (assured_meta + assured_design + assured_eligibility + assured_objectives
                    + assured_estimands)
     # Completeness (task 3.6): expected-vs-found across domains, over current-scope text.
     gaps = account(design=design, grid=grid, eligibility=elig, objectives=objs,
-                   wrapper=study.get("wrapper"), evidence_text=design_doc.full_text)
+                   wrapper=study.get("wrapper"), evidence_text=win["design"].document.full_text)
     findings += gaps
     demote_on_error(all_assured, gaps)
 
@@ -260,6 +241,10 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
                      "windows": {d: w.retrieval_config() for d, w in win.items()}}
                     if routed else None),
         "validation": study.get("validation"),
+        "assembly": study.get("assembly"),
+        "repair": {"rounds": repair.rounds, "resolved": repair.resolved,
+                   "unresolved": repair.unresolved,
+                   "adopted": [f"round {r}: {d}" for r, d in repair.adopted]},
     }
     for a in all_assured:
         review["decision_summary"][a.decision.value] += 1
@@ -269,7 +254,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
                       assured_design, assured_eligibility, assured_objectives,
                       routed=routed, findings=findings, windows=win,
                       source_sha256=source_sha256, run_id=run_id, estimands=estimands,
-                      amendment_diff=amendment_diff)
+                      amendment_diff=amendment_diff, repair=repair)
 
 
 @dataclass

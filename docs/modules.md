@@ -56,7 +56,10 @@ their own).*
 | `extract/metadata.py` | **C1** — study title, acronym, sponsor, phase, identifiers, version. Two independent deterministic methods (`labels`, `titlepage`) plus an optional LLM member. |
 | `extract/design.py` | **C2** — study type, intervention model, and arms (parsed from the randomization sentence), with arm types. |
 | `extract/eligibility.py` | **C3** — inclusion/exclusion criteria (stored as free text per USDM), planned age range, sex. |
-| `extract/objectives.py` | **C4** — primary/secondary objectives and endpoints (Estimands deferred to Phase 6). |
+| `extract/objectives.py` | **C4** — primary/secondary objectives and endpoints. |
+| `extract/estimands.py` | **C5** — ICH E9(R1) estimands (task 6.1): population, variable, treatment, intercurrent events + strategies, summary measure. Three members — a deterministic label parser (accepts only groups with an estimand's hallmarks), the `hard_reasoning` role, and `extract_alt` (a different family) — every attribute quote-grounded, aligned across members, and triaged through the same `assure()` as every other domain. An intercurrent event no member can ground is dropped and reported. |
+| `extract/amendments.py` | Section-level diff of two protocol versions (task 6.2): sections matched by title (renumbering is not a change), running headers/footers removed, each change's exact words described and grounded in the new version, rationale taken from the amended version's own amendment summary (unexplained changes are reported). |
+| `extract/domains.py` | One `extract_domain()` entry point per domain (C1-C4) — used by `run_full`'s first pass and by every repair-loop re-extraction, so the two cannot drift. |
 | `extract/soa/methods.py` | SoA table extractors: `pdfplumber` and `pymupdf` (single-page-only, kept for cross-validation diversity), `pymupdf_stitched` (multi-page-aware, via `soa/stitch.py` + `soa/from_stitched.py` — the ensemble member `pipeline.py`/`convert-soa` prefer, falling back to `pymupdf` when a table's header isn't the 3-row shape), and `vision` (frontier VLM cell-content pass, `soa/vision_cells.py`). |
 | `extract/soa/crossval.py` | Cell-by-cell cross-validation → `AssuredGrid` with provenance tags. |
 | `extract/soa/grid.py` | The SoA intermediate representation (`SoAGrid`, `AssuredCell`, `AssuredGrid`). |
@@ -93,16 +96,16 @@ reasoning, then constrained JSON) emission — see DESIGN.md §3 L4.*
 | `assemble/metadata.py` | Patch assured metadata into a minimal conformant USDM skeleton (used by the C1 spine). |
 | `assemble/soa.py` | `AssuredGrid` → `TimelineInput` → USDM ScheduleTimeline entities via the data4knowledge `TimelineAssembler`. |
 | `assemble/study.py` | Compose the full `AssemblerInput` from every domain and run the top-level `Assembler` → one USDM 4.0 study. |
-| `assemble/sanitizer.py` *(planned)* | Enforces the Assembler's implicit input contract before `execute()` — no empty required strings, valid role keys, well-formed enrollment blocks. Sanitizer repairs are logged as quality findings. |
-| `assemble/builder_fallback.py` *(planned)* | Per-section fallback to `usdm4.builder` when the Assembler errors on a section, with the run's assembler-reliance ratio recorded. |
+| `assemble/sanitize.py` | The one place the assembler input is repaired (task 6.3), and never silently: every placeholder (an invented phase, identifier, eligibility criteria, intervention model -> `ERROR`; a defaulted version, date, acronym -> `WARNING`), dropped empty item, de-duplicated arm name or normalization is a `SANITIZER` finding. |
+| `assemble/fallback.py` | Per-section fallback (task 6.3): estimands the assembler rejects are removed and objectives retried; an optional section it rejects (SoA, objectives, amendments) is dropped and the rest salvaged; dropped objectives are rebuilt with the assembler's own `Builder`/`Encoder`. Sections a sub-assembler dropped quietly are detected. Reports the **assembler reliance ratio** (sections the assembler itself produced / supplied). |
+| `assemble/estimands.py`, `assemble/amendments.py` | Link estimands to named endpoints/interventions (unlinkable ones are omitted and reported); map an amendment diff to `AmendmentsInput`, reporting that impact flags are an unassessed default. |
 
 ## L8 — Validation
 
 | Module | Role |
 |---|---|
 | `validate/gate.py` | The conformance gates: pydantic structural, d4k rule engine (offline), CDISC CORE (optional, needs API key). |
-| `validate/rule_map.py` *(planned)* | Declarative `rule_id → (domain, field, repair action)` table bridging validation findings to targeted re-extraction. |
-| `repair/loop.py` *(planned)* | Bounded (≤2 round) repair loop driven by `rule_map.py`; unresolved findings become `review`/`block`, never silently dropped. |
+| `validate/repair.py` | `RULE_MAP` (rule -> domain, fields, re-extractable or known gap) and the bounded repair loop (task 6.3, at most 2 rounds): re-extracts only what failing re-extractable rules point at, escalating per round (unrouted evidence, then the `hard_reasoning` member), adopts a re-extraction only if it improves a target and loses nothing, re-validates only when something changed. Unresolved rules become `ERROR` findings with their fields moved to `review`; known gaps are `WARNING`s naming the gap. |
 
 ## L9 — Certification *(v0.3 Phase 5, CP5-A)*
 

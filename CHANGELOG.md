@@ -6,6 +6,36 @@ yet semantically versioned.
 
 ## [Unreleased]
 
+### Phase 6 in progress — Hard domains + repair loop (CP6-A)
+
+- **Estimands (task 6.1)** — `extract/estimands.py` / `assemble/estimands.py`: grounded
+  ICH E9(R1) estimands from three members (deterministic, `hard_reasoning`, `extract_alt`),
+  reconciled through `assure()`, linked to named endpoints and interventions, assembled into
+  the USDM study. New `llm/prompts/c5_estimands.*`; `two_pass.run_two_pass()`;
+  `router.get_role_llm()`.
+- **Amendments (task 6.2)** — `extract/amendments.py` / `assemble/amendments.py`: a
+  section-level diff of two versions with grounded change descriptions and rationale from the
+  amended version's summary, assembled as a `StudyAmendment`. `run_full(previous_version=...)`,
+  `usdm4 convert-full --previous`. Verified on synthetic versions only: the three dated local
+  PDFs Phase 6 was meant to use are not an amendment chain (task 0.6's spike).
+- **Sanitizer, fallback, repair loop (task 6.3)** — `assemble/sanitize.py` reports every
+  placeholder the assembler input used to carry silently (fabricated phase, identifier and
+  eligibility criteria are `ERROR`s); `assemble/fallback.py` salvages a study when one section
+  fails and reports the assembler reliance ratio; `validate/repair.py` is the bounded (≤2 round)
+  rule -> re-extraction loop. `extract/domains.py` unifies first-pass and repair extraction.
+
+Fixed:
+- **Assembler errors were never read.** `simple_error_log.Errors` has no `.errors` attribute;
+  the reader swallowed the resulting exception and returned `[]`, so `assembler_errors` was
+  empty in every result since Phase 0 and `test_assembles_without_errors` passed vacuously.
+  Now read via `to_dict()`.
+- **No sponsor was ever assembled.** That fix exposed a hidden error: the protocol identifier's
+  scope was `{"standard": "sponsor"}`, but `standard` only accepts registry/regulator keys, so
+  the assembler dropped the identifier, the sponsor organisation and its study role. The
+  sponsor is now a `non_standard` organisation with role `sponsor`. DDF00172 and DDF00201 now
+  pass; DDF00140/DDF00200 now fail instead, because the sponsor's organisation type is not
+  extracted and is honestly recorded as CDISC "Unknown" (task 6.4 extracts organisations).
+
 ### Phase 5 in progress — Review UI + certification (v0.3.5, CP5-A)
 
 **Major milestone:** `run_full()` now writes a Part 11 audit trail — every field decision

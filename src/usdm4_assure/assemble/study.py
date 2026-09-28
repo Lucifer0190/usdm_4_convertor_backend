@@ -8,9 +8,9 @@ This closes the loop: PDF -> C1 metadata + C2 design + SoA grid -> conformant US
 """
 from __future__ import annotations
 
-import os
-
 from usdm4_assure.assemble.estimands import link_estimands
+from usdm4_assure.assemble.fallback import assemble
+from usdm4_assure.assemble.sanitize import sanitize
 from usdm4_assure.assemble.soa import grid_to_timeline_input
 from usdm4_assure.contracts import AssuredField, Finding
 from usdm4_assure.extract.design import DesignExtract
@@ -52,11 +52,10 @@ def _assembler_input(meta: dict, design: DesignExtract, ag: AssuredGrid,
                      elig: EligibilityExtract, objs: ObjectivesExtract,
                      estimands: EstimandsExtract | None = None
                      ) -> tuple[dict, list[Finding]]:
-    title = meta.get("studyTitle") or "Untitled Study"
-    acronym = meta.get("studyAcronym") or title[:20]
-    ident = meta.get("protocolIdentifier") or "SPONSOR-0000"
-    version = meta.get("studyVersionIdentifier") or "1"
-    phase = meta.get("studyPhase") or "Phase 1"
+    """The *raw* assembler input: extracted values only, ``None`` wherever
+    extraction found nothing. :func:`usdm4_assure.assemble.sanitize.sanitize`
+    is the one place those gaps are filled, each one reported as a finding."""
+    version = meta.get("studyVersionIdentifier")
     interventions, arm_names = _interventions_from_arms(design)
     objectives, findings = link_estimands(estimands or EstimandsExtract(),
                                           _objectives_block(objs),
@@ -64,41 +63,44 @@ def _assembler_input(meta: dict, design: DesignExtract, ag: AssuredGrid,
 
     return {
         "identification": {
-            "titles": {"brief": acronym, "official": title},
+            "titles": {"brief": meta.get("studyAcronym"), "official": meta.get("studyTitle")},
+            # The protocol identifier's organisation IS the sponsor in usdm4's model:
+            # a non_standard organisation with role "sponsor" (``standard`` only takes
+            # registry/regulator keys such as "nct" — "sponsor" there made the
+            # assembler drop the identifier, the sponsor and its study role).
             "identifiers": [
-                {"identifier": ident, "scope": {"standard": "sponsor"}}
+                {"identifier": meta.get("protocolIdentifier"),
+                 "scope": {"non_standard": {"type": None, "role": "sponsor",
+                                            "name": meta.get("sponsorName"),
+                                            "label": meta.get("sponsorName")}}}
             ],
         },
         "document": {
             "document": {"label": "Protocol", "version": version, "status": "final",
-                         "template": "Sponsor", "version_date": "2026-01-01"},
-            "sections": [{"section_number": "1", "section_title": "Synopsis",
-                          "text": "Synopsis extracted from protocol."}],
+                         "template": "Sponsor", "version_date": None},
+            "sections": None,
         },
         "population": {
-            "label": f"{acronym} Population",
-            "inclusion_exclusion": {
-                "inclusion": elig.inclusion or ["Adults >= 18 years"],
-                "exclusion": elig.exclusion or ["Pregnancy"],
-            },
+            "label": None,
+            "inclusion_exclusion": {"inclusion": list(elig.inclusion),
+                                    "exclusion": list(elig.exclusion)},
             "demographics": {
                 "age_min": elig.age_min, "age_max": elig.age_max,
                 "age_unit": elig.age_unit, "sex": elig.sex,
-                "healthy_volunteers": False,
+                "healthy_volunteers": None,
             },
         },
         "study_design": {
-            "label": f"{acronym} Design",
-            "rationale": "Derived from protocol synopsis.",
-            "trial_phase": phase,
-            "intervention_model": design.intervention_model or "Parallel",
+            "label": None,
+            "rationale": None,
+            "trial_phase": meta.get("studyPhase"),
+            "intervention_model": design.intervention_model,
             "arms": [{"name": a["name"], "type": a["type"],
                       "intervention_names": arm_names.get(a["name"], [])}
                      for a in design.arms],
             "interventions": interventions,
         },
-        "study": {"name": {"acronym": acronym}, "label": title[:120],
-                  "version": version, "rationale": "Assembled by USDM4-Assure."},
+        "study": {"name": None, "label": None, "version": version, "rationale": None},
         "objectives": objectives,
         "soa": grid_to_timeline_input(ag),
     }, findings
@@ -132,31 +134,27 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
     Returns:
         A dict with keys ``ok`` (bool), ``wrapper`` (the USDM dict or ``None``),
         ``validation`` (gate report), ``assembler_errors`` (list[str]),
-        ``summary`` (entity counts + resolved phase code) and ``findings``
-        (problems found while composing the assembler input).
+        ``summary`` (entity counts + resolved phase code), ``findings``
+        (every sanitizer repair and assembly fallback step) and ``assembly``
+        (which sections the assembler produced, fell back, or dropped, and
+        the assembler reliance ratio).
     """
-    import usdm4
-    from simple_error_log.errors import Errors
-    from usdm4.assembler.assembler import Assembler
-
     elig = elig or EligibilityExtract()
     objs = objs or ObjectivesExtract()
     meta = {a.field: a.value for a in assured_meta if a.value}
-    data, findings = _assembler_input(meta, design, ag, elig, objs, estimands)
+    raw, findings = _assembler_input(meta, design, ag, elig, objs, estimands)
     if amendments:
-        data["amendments"] = amendments
+        raw["amendments"] = amendments
+    data, repairs = sanitize(raw)
+    findings = findings + repairs
 
-    root = os.path.dirname(usdm4.__file__)
-    errors = Errors()
-    assembler = Assembler(root, errors)
-    assembler.execute(data)
+    outcome = assemble(data)
+    findings += outcome.findings
+    if not outcome.study_ok:
+        return {"ok": False, "assembler_errors": outcome.errors, "wrapper": None,
+                "validation": None, "findings": findings, "assembly": outcome.report()}
 
-    if assembler.study is None:
-        return {"ok": False, "assembler_errors": _dump(errors),
-                "wrapper": None, "validation": None, "findings": findings}
-
-    wrapper = assembler.wrapper(name="USDM4-Assure", version="0.1.0")
-    wdict = wrapper.model_dump(by_alias=True)
+    wdict = outcome.wrapper
     validation = validate_wrapper(wdict, run_core=run_core)
 
     sv = wdict["study"]["versions"][0]
@@ -172,11 +170,5 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
         "study_phase": (design_obj.get("studyPhase") or {}).get("standardCode", {}),
     }
     return {"ok": True, "wrapper": wdict, "validation": validation,
-            "assembler_errors": _dump(errors), "summary": summary, "findings": findings}
-
-
-def _dump(errors) -> list[str]:
-    try:
-        return [str(e) for e in errors.errors]
-    except Exception:  # noqa: BLE001
-        return []
+            "assembler_errors": outcome.errors, "summary": summary, "findings": findings,
+            "assembly": outcome.report()}
