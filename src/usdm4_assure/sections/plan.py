@@ -27,6 +27,7 @@ DOMAIN_ROUTES: dict[str, str] = {
     "design": "design_structure",
     "eligibility": "populations_eligibility",
     "objectives": "objectives_endpoints",
+    "estimands": "estimands",
     "soa": "schedule_activities",
 }
 

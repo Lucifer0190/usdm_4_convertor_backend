@@ -28,11 +28,12 @@ from usdm4_assure.contracts import AssuredField, Decision, FieldCandidate, Findi
 from usdm4_assure.extract import metadata as c1
 from usdm4_assure.extract.design import DESIGN_FIELDS
 from usdm4_assure.extract.eligibility import EligibilityExtract
+from usdm4_assure.extract.estimands import estimand_evidence, extract_estimands
 from usdm4_assure.extract.objectives import ObjectivesExtract
 from usdm4_assure.extract.shards import ELIGIBILITY_FIELDS, OBJECTIVES_FIELDS
 from usdm4_assure.extract.windows import window_for
 from usdm4_assure.ingest.pdf import ingest
-from usdm4_assure.llm.router import get_llm
+from usdm4_assure.llm.router import get_llm, get_role_llm
 from usdm4_assure.sections.plan import build_plan
 from usdm4_assure.validate.gate import validate_wrapper
 
@@ -102,6 +103,7 @@ class FullResult:
         source_sha256: The source PDF's sha256 — the audit store's key, and
             what the review UI (task 5.1) looks a run up by.
         run_id: This run's id in the audit store.
+        estimands: The reconciled ``EstimandsExtract`` (C5, task 6.1).
     """
     assured_meta: list[AssuredField]
     design: object
@@ -118,6 +120,7 @@ class FullResult:
     windows: dict = field(default_factory=dict)
     source_sha256: str = ""
     run_id: str = ""
+    estimands: object = None
 
 
 def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
@@ -161,7 +164,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     members = _members(use_slm)
     routed = build_plan(doc, pdf_path) if routing else None
     win = {d: window_for(doc, routed, d)
-           for d in ("metadata", "design", "eligibility", "objectives")}
+           for d in ("metadata", "design", "eligibility", "objectives", "estimands")}
     findings = [f for w in win.values() for f in w.findings]
 
     meta_doc = win["metadata"].document
@@ -179,17 +182,27 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     objs = extract_objectives(obj_doc)
     assured_objectives = assure(_objectives_candidates(objs), obj_doc, OBJECTIVES_FIELDS,
                                 domain="objectives")
+    # C5 estimands (task 6.1): the hard_reasoning role plus a different-family
+    # extract_alt member on top of the deterministic parser.
+    estimands = extract_estimands(
+        estimand_evidence(win["estimands"].document, routed),
+        [get_role_llm("hard_reasoning"), get_role_llm("extract_alt")])
+    assured_estimands = estimands.assured_fields()
+    findings += estimands.findings
     # The stitcher (task 2.3) is multi-page-aware; a table it can't confidently
     # reduce to the 3-header-row shape falls back to the single-page path.
     pymupdf_grid = extract_pymupdf_stitched(pdf_path) or extract_pymupdf(pdf_path)
     grid = cross_validate([extract_pdfplumber(pdf_path), pymupdf_grid])
 
-    study = build_full_study(assured_meta, design, grid, elig, objs, run_core=run_core)
+    study = build_full_study(assured_meta, design, grid, elig, objs, run_core=run_core,
+                             estimands=estimands)
+    findings += study.get("findings", [])
     if study.get("wrapper"):
         (out_dir / "study.usdm.json").write_text(
             json.dumps(study["wrapper"], indent=2, default=str), encoding="utf-8")
 
-    all_assured = assured_meta + assured_design + assured_eligibility + assured_objectives
+    all_assured = (assured_meta + assured_design + assured_eligibility + assured_objectives
+                   + assured_estimands)
     # Completeness (task 3.6): expected-vs-found across domains, over current-scope text.
     gaps = account(design=design, grid=grid, eligibility=elig, objectives=objs,
                    wrapper=study.get("wrapper"), evidence_text=design_doc.full_text)
@@ -206,7 +219,8 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     audit_store = AuditStore(source_sha256=source_sha256)
     for domain, fields_ in (("metadata", assured_meta), ("design", assured_design),
                             ("eligibility", assured_eligibility),
-                            ("objectives", assured_objectives)):
+                            ("objectives", assured_objectives),
+                            ("estimands", assured_estimands)):
         write_run(audit_store, run_id=run_id, source_sha256=source_sha256, domain=domain,
                  assured_fields=fields_, retrieval_config=win[domain].retrieval_config())
     audit_store.close()
@@ -231,7 +245,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     return FullResult(assured_meta, design, grid, study, out_dir, elig, objs,
                       assured_design, assured_eligibility, assured_objectives,
                       routed=routed, findings=findings, windows=win,
-                      source_sha256=source_sha256, run_id=run_id)
+                      source_sha256=source_sha256, run_id=run_id, estimands=estimands)
 
 
 @dataclass

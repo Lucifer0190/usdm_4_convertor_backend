@@ -66,6 +66,19 @@ def get_llm(model: str | None = None) -> LLM:
     return StubLLM()
 
 
+def get_role_llm(role: str) -> LLM:
+    """The OpenRouter member for one ``config/models.yaml`` role, or a ``StubLLM``.
+
+    Used where a task names its role explicitly (e.g. estimands: the
+    ``hard_reasoning`` role as primary, ``extract_alt`` as the second,
+    different-family member). Honors ``USDM4_NO_LLM``; no OpenRouter key means
+    a stub, so the deterministic members carry the run.
+    """
+    if os.environ.get("USDM4_NO_LLM") or not openrouter_key():
+        return StubLLM()
+    return OpenRouterLLM(role=role, name=role)
+
+
 def get_slm(model: str | None = None) -> LLM:
     """Return the small-model (SLM) member for narrow tasks and ensemble diversity.
 

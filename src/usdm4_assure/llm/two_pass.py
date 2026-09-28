@@ -45,21 +45,52 @@ def _load_template(name: str) -> str:
     return (_PROMPTS_DIR / name).read_text(encoding="utf-8")
 
 
-def _pass_names(shard: Shard) -> tuple[str, str]:
-    return f"{shard.id}.pass1.md", f"{shard.id}.pass2.md"
+def _pass_names(shard: Shard | str) -> tuple[str, str]:
+    prompt_id = shard if isinstance(shard, str) else shard.id
+    return f"{prompt_id}.pass1.md", f"{prompt_id}.pass2.md"
 
 
-def prompt_hash(shard: Shard) -> str:
-    """A stable hash of a shard's two prompt templates.
+def template_hash(prompt_id: str) -> str:
+    """A stable hash of a prompt id's two templates (``<id>.pass{1,2}.md``).
 
     Depends only on the template *files* on disk, not on any document or
-    model — two calls against the same shard on different protocols get the
+    model — two calls against the same prompt on different protocols get the
     same hash, and editing a template (a new prompt "version") changes it.
     This is the ``prompt_hash`` recorded in every :class:`AuditRecord`.
     """
-    p1_name, p2_name = _pass_names(shard)
-    payload = shard.id + "\x00" + _load_template(p1_name) + "\x00" + _load_template(p2_name)
+    p1_name, p2_name = _pass_names(prompt_id)
+    payload = prompt_id + "\x00" + _load_template(p1_name) + "\x00" + _load_template(p2_name)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def prompt_hash(shard: Shard) -> str:
+    """:func:`template_hash` of a flat shard's templates."""
+    return template_hash(shard.id)
+
+
+def run_two_pass(llm: LLM, prompt_id: str, document_text: str, **values: str
+                 ) -> list | None:
+    """Both passes for any prompt id; returns the parsed JSON array, or ``None``.
+
+    The shared engine behind :func:`extract_shard` (flat ``{field, value,
+    quote}`` shards) and structured extractors such as estimands, whose JSON
+    items nest. ``values`` fill the templates' other placeholders. ``None``
+    means the member failed (unavailable, error, or unparseable output) — a
+    bad LLM member must never crash the run.
+    """
+    if not getattr(llm, "available", False):
+        return None
+    p1_name, p2_name = _pass_names(prompt_id)
+    text = document_text[:_MAX_DOC_CHARS]
+    try:
+        reasoning = llm.complete(_fill(_load_template(p1_name), document_text=text, **values),
+                                 task="extract_prose", max_tokens=800)
+        raw = llm.complete(_fill(_load_template(p2_name), reasoning=reasoning,
+                                 document_text=text, **values),
+                           task="extract_prose", max_tokens=1600)
+        return _parse_json_items(raw)
+    except Exception:  # noqa: BLE001 — a bad LLM member must not crash the run
+        return None
 
 
 def _fill(template: str, **values: str) -> str:
@@ -87,25 +118,11 @@ def extract_shard(doc: Document, llm: LLM, shard: Shard) -> list[GroundedCandida
         fails to produce parseable output — a bad LLM member must not crash
         the run (mirrors the existing single-pass ``extract_llm`` behavior).
     """
-    if not getattr(llm, "available", False):
+    items = run_two_pass(llm, shard.id, doc.full_text, description=shard.description,
+                         fields=", ".join(shard.fields))
+    if items is None:
         return []
-
-    p1_name, p2_name = _pass_names(shard)
     phash = prompt_hash(shard)
-    fields_str = ", ".join(shard.fields)
-    text = doc.full_text[:_MAX_DOC_CHARS]
-
-    try:
-        pass1_prompt = _fill(_load_template(p1_name), description=shard.description,
-                             fields=fields_str, document_text=text)
-        reasoning = llm.complete(pass1_prompt, task="extract_prose", max_tokens=800)
-
-        pass2_prompt = _fill(_load_template(p2_name), fields=fields_str,
-                             reasoning=reasoning, document_text=text)
-        raw = llm.complete(pass2_prompt, task="extract_prose", max_tokens=1200)
-        items = _parse_json_items(raw)
-    except Exception:  # noqa: BLE001 — a bad LLM member must not crash the run
-        return []
 
     model_id = getattr(llm, "model", None) or getattr(llm, "name", None)
     out: list[GroundedCandidate] = []

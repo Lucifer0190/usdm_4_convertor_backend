@@ -81,7 +81,8 @@ def test_review_records_route_plan(result):
     import json
     review = json.loads((result.out_dir / "review.json").read_text(encoding="utf-8"))
     assert review["routing"]["route_plan_hash"] == result.routed.plan_hash
-    assert set(review["routing"]["windows"]) == {"metadata", "design", "eligibility", "objectives"}
+    assert set(review["routing"]["windows"]) == {"metadata", "design", "eligibility",
+                                                 "objectives", "estimands"}
     assert isinstance(review["findings"], list)
 
 
