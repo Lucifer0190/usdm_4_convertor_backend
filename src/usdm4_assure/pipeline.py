@@ -104,6 +104,8 @@ class FullResult:
             what the review UI (task 5.1) looks a run up by.
         run_id: This run's id in the audit store.
         estimands: The reconciled ``EstimandsExtract`` (C5, task 6.1).
+        amendment_diff: The section-level ``AmendmentDiff`` against
+            ``previous_version`` (task 6.2), or ``None``.
     """
     assured_meta: list[AssuredField]
     design: object
@@ -121,11 +123,13 @@ class FullResult:
     source_sha256: str = ""
     run_id: str = ""
     estimands: object = None
+    amendment_diff: object = None
 
 
 def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
              run_core: bool = False, use_slm: bool = False,
-             routing: bool = True) -> FullResult:
+             routing: bool = True, previous_version: str | Path | None = None,
+             amendment_identifier: str | None = None) -> FullResult:
     """Run the full loop: PDF -> C1 metadata + C2 design + C3/C4 + SoA -> one study.
 
     Ingests the PDF once, runs every domain extractor over it, reconciles the SoA
@@ -141,6 +145,11 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         routing: Build the section graph + route plan and give each domain a
             scoped evidence window (task 3.5). ``False`` feeds every extractor
             the whole document — the routing-off arm of the Phase 3 eval.
+        previous_version: The prior version of this protocol. When given, the
+            two are diffed section by section (task 6.2) and the result is
+            assembled as a USDM ``StudyAmendment``.
+        amendment_identifier: The amendment's number; defaults to the
+            extracted ``studyVersionIdentifier``.
 
     Returns:
         A ``FullResult`` bundling every domain's extract, the assembled study,
@@ -194,8 +203,22 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     pymupdf_grid = extract_pymupdf_stitched(pdf_path) or extract_pymupdf(pdf_path)
     grid = cross_validate([extract_pdfplumber(pdf_path), pymupdf_grid])
 
+    amendment_diff, amendments_data = None, None
+    if previous_version is not None:
+        from usdm4_assure.assemble.amendments import amendment_input
+        from usdm4_assure.extract.amendments import diff_versions
+        from usdm4_assure.sections.graph import build_graph
+        prev_doc = ingest(previous_version)
+        amendment_diff = diff_versions(
+            prev_doc, doc, build_graph(prev_doc, previous_version),
+            routed.graph if routed else build_graph(doc, pdf_path))
+        amendments_data, amendment_findings = amendment_input(
+            amendment_diff,
+            identifier=amendment_identifier or meta.get("studyVersionIdentifier") or "1")
+        findings += amendment_diff.findings + amendment_findings
+
     study = build_full_study(assured_meta, design, grid, elig, objs, run_core=run_core,
-                             estimands=estimands)
+                             estimands=estimands, amendments=amendments_data)
     findings += study.get("findings", [])
     if study.get("wrapper"):
         (out_dir / "study.usdm.json").write_text(
@@ -245,7 +268,8 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     return FullResult(assured_meta, design, grid, study, out_dir, elig, objs,
                       assured_design, assured_eligibility, assured_objectives,
                       routed=routed, findings=findings, windows=win,
-                      source_sha256=source_sha256, run_id=run_id, estimands=estimands)
+                      source_sha256=source_sha256, run_id=run_id, estimands=estimands,
+                      amendment_diff=amendment_diff)
 
 
 @dataclass

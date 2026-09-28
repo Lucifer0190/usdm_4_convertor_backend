@@ -108,7 +108,8 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
                      ag: AssuredGrid, elig: EligibilityExtract | None = None,
                      objs: ObjectivesExtract | None = None,
                      run_core: bool = False,
-                     estimands: EstimandsExtract | None = None) -> dict:
+                     estimands: EstimandsExtract | None = None,
+                     amendments: dict | None = None) -> dict:
     """Assemble one complete USDM 4.0 study from every domain's assured output.
 
     Composes a data4knowledge ``AssemblerInput`` from the extracted domains, runs
@@ -124,6 +125,9 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
         run_core: If ``True``, also run the CDISC CORE gate during validation.
         estimands: Reconciled estimands (C5, task 6.1), linked to named
             endpoints and interventions before assembly.
+        amendments: An ``AmendmentsInput``-shaped dict (task 6.2,
+            ``assemble.amendments.amendment_input``), or ``None`` for an
+            original protocol.
 
     Returns:
         A dict with keys ``ok`` (bool), ``wrapper`` (the USDM dict or ``None``),
@@ -139,6 +143,8 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
     objs = objs or ObjectivesExtract()
     meta = {a.field: a.value for a in assured_meta if a.value}
     data, findings = _assembler_input(meta, design, ag, elig, objs, estimands)
+    if amendments:
+        data["amendments"] = amendments
 
     root = os.path.dirname(usdm4.__file__)
     errors = Errors()

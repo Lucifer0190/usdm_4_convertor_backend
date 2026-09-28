@@ -83,11 +83,13 @@ def convert(pdf: str, out: str = "data/out", core: bool = False,
 
 @app.command("convert-full")
 def convert_full(pdf: str, out: str = "data/out_full", core: bool = False,
-                 slm: bool = False, require_llm: bool = False) -> None:
+                 slm: bool = False, require_llm: bool = False, previous: str = "") -> None:
     """Full loop: PDF -> metadata + design + SoA -> one conformant USDM 4.0 study.
 
     Pass --slm to add a cheap different-family SLM member to the metadata ensemble.
     Pass --require-llm to fail if no LLM key is configured.
+    Pass --previous <pdf> (the prior protocol version) to diff the two and
+    assemble the changes as a USDM StudyAmendment.
     """
     import os
 
@@ -97,7 +99,8 @@ def convert_full(pdf: str, out: str = "data/out_full", core: bool = False,
         os.environ["USDM4_REQUIRE_LLM"] = "1"
 
     console.rule("[bold]USDM4-Assure — full study")
-    r = run_full(pdf, out_dir=out, run_core=core, use_slm=slm)
+    r = run_full(pdf, out_dir=out, run_core=core, use_slm=slm,
+                 previous_version=previous or None)
     s = r.study
     if not s.get("ok"):
         console.print(f"[red]Assembler failed[/]: {s.get('assembler_errors')[:3]}")
@@ -109,6 +112,9 @@ def convert_full(pdf: str, out: str = "data/out_full", core: bool = False,
     console.print(f"[bold]Gates[/] — structural: {_g(v.get('structural'))} | "
                   f"d4k: {_d4k(v.get('d4k'))} | core: {_core(v.get('core'))}")
     console.print(f"assembler errors: {len(s['assembler_errors'])}")
+    if r.amendment_diff is not None:
+        console.print(f"amendment: {len(r.amendment_diff.changes)} changed section(s) "
+                      f"vs {previous}")
     console.print(f"Artifact → [dim]{r.out_dir}/study.usdm.json[/]")
 
 
