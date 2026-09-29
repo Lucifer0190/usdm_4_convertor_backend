@@ -67,7 +67,7 @@ labeler tag, and — unlike the frozen set — are freely regenerable on every c
 
 ## Security posture
 
-**Localhost only, no auth**, by design (DESIGN.md L9, PLAN.md CP5-A): this is a
+**Localhost only, no auth**, by design (DESIGN.md L9, docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md CP5-A): this is a
 human-in-the-loop tool for one operator on their own machine, not a multi-tenant service.
 Every write is still fully accountable — reviewer id and reason are required on every edit,
 and nothing is ever silently overwritten — but access control is out of scope until there is

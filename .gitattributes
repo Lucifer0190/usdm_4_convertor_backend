@@ -1,0 +1,14 @@
+# Normalise line endings in the repository so Windows and Linux checkouts do not produce
+# whole-file diffs. Text is stored with LF; working copies use the platform default.
+* text=auto
+
+# Files that must stay LF even on Windows (they run on Linux).
+*.sh text eol=lf
+docker/* text eol=lf
+Dockerfile text eol=lf
+
+# Binary content: never touched by line-ending conversion or diffs.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.sqlite binary

@@ -1,4 +1,4 @@
-# Protocol family (study_archetype) taxonomy (task 3.2, DEVPLAN.md §3-A).
+# Protocol family (study_archetype) taxonomy (task 3.2, docs/ai/archive/DEVPLAN-v0.3-tiered-tasks.md §3-A).
 #
 # Extracted from the reference extractor's rule-first fingerprinting logic
 # (Rewant's_USDM_Extractor/app/services/study_fingerprint.py, ~line 520-590)
@@ -17,7 +17,7 @@
 # pipeline does not have yet. Source signals that need graph features we do
 # not compute (scope counts, image-heavy schema) are not approximated.
 #
-# Note: DEVPLAN.md refers to "11 documented protocol families"; the source
+# Note: docs/ai/archive/DEVPLAN-v0.3-tiered-tasks.md refers to "11 documented protocol families"; the source
 # defines 19 distinct study_archetype values. Extracted faithfully to source
 # rather than trimmed to match the plan's approximate count.
 

@@ -1,4 +1,4 @@
-# Section classification taxonomy (task 3.2, DEVPLAN.md §3-A).
+# Section classification taxonomy (task 3.2, docs/ai/archive/DEVPLAN-v0.3-tiered-tasks.md §3-A).
 #
 # Extracted from the reference extractor's classification logic
 # (Rewant's_USDM_Extractor/app/services/protocol_section_graph.py) as config

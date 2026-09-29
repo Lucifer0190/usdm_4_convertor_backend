@@ -67,5 +67,5 @@ services:
     profiles: ["review"]
 
 # Neo4j (property-graph data layer) was parked here in earlier iterations. It is
-# deliberately not scheduled — see PLAN.md's Phase-2+ deferrals — and is not
+# deliberately not scheduled — see docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md's Phase-2+ deferrals — and is not
 # represented as a service; add it back only when a phase actually calls for it.

@@ -30,7 +30,7 @@ but they unlock additional capability.
 > **v0.3 note:** logprobs are never load-bearing anywhere in this pipeline. OpenRouter
 > accepts a `logprobs` parameter, but not every routed provider returns it — Anthropic does
 > not — so a design that depends on it breaks silently on a model swap. See
-> [`../DESIGN.md`](../DESIGN.md) §4 and [`../PLAN.md`](../PLAN.md) for why.
+> [`../DESIGN.md`](../DESIGN.md) §4 and [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) for why.
 
 The LLM resolution order is OpenRouter → direct Anthropic → stub (see `llm/router.py`).
 With a key present, the Claude member joins the Assurance ensemble as an additional
@@ -40,7 +40,7 @@ from 1/6 to 5/6 on the reference fixture).
 ### Role-based model selection
 
 Models are selected by role (e.g., `extract`, `verify`, `vision`) not by tier. See
-`config/models.yaml` for the mapping and [`../PLAN.md`](../PLAN.md) §4.1 for the rationale
+`config/models.yaml` for the mapping and [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) §4.1 for the rationale
 behind each choice. **All roles use frontier models by default** (Claude Sonnet 4.5, GPT-5.1,
 Gemini 3.1 Pro). Override any role with `USDM4_MODEL_<ROLE>` environment variable
 (e.g., `USDM4_MODEL_VERIFY=anthropic/claude-opus-4.8`).
@@ -48,7 +48,7 @@ Gemini 3.1 Pro). Override any role with `USDM4_MODEL_<ROLE>` environment variabl
 > **v0.3 note — SLM experimental opt-in:** Earlier versions used small models like
 > Llama-3.1-8B as a second ensemble member to improve metadata auto-accept. Published
 > evidence shows frontier models now outperform SLMs in every measured domain (see
-> [`../PLAN.md`](../PLAN.md) §4.2). The `--slm` flag is parked but not removed — if a
+> [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) §4.2). The `--slm` flag is parked but not removed — if a
 > future eval shows a domain where frontier accuracy falls below an SLM's published
 > benchmark, that SLM can return via config change only. OpenRouter has no clinical
 > fine-tuned model in its catalog (checked 60 providers / 411 models); a true clinical
@@ -108,7 +108,7 @@ spikes/             fixtures (make_*.py), the spike log, and scratch probes (_*.
 docs/               this documentation
 docker/             Dockerfile; compose at repo root
 DESIGN.md           the v0.3 technical design (architecture layer)
-PLAN.md             the evidence review and phased roadmap behind v0.3
+docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md             the evidence review and phased roadmap behind v0.3
 ```
 
 ## Documentation site (optional)

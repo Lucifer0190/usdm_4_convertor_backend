@@ -46,7 +46,7 @@ the target v0.3 layout from [`../DESIGN.md`](../DESIGN.md) §6 — planned modul
 | `extract/windows.py` | `window_for(doc, routed, domain)` filters a domain's `Document` down to its route's allowed scopes, plus a currentness guard (amendment-history and historic SoA/amendment surfaces are always excluded, on every domain but `amendments`) that the ported prohibited-scopes alone don't catch — the reference's historic prohibitions name a `source_surfaces` axis this graph doesn't populate. Filtered sections become `SCOPE` findings; a missing section graph is a `WARNING`, not silence. |
 
 *The section title classifier and the currentness guard are ours; the route-mapping tables
-in `sections/_ported_*.py` are near-verbatim ports (DEVPLAN.md's porting rule — no tests of
+in `sections/_ported_*.py` are near-verbatim ports (docs/ai/archive/DEVPLAN-v0.3-tiered-tasks.md's porting rule — no tests of
 their own).*
 
 ## L4 — Extraction
@@ -136,7 +136,7 @@ returns them (Anthropic does not). See DESIGN.md §4.*
 ## Deferred (recorded, not stubbed)
 
 Neo4j graph store, closed-loop SLM fine-tuning at scale, and Merkle/replay audit receipts
-are deliberately deferred per `PLAN.md` §7 — they are valuable Phase-2+ investments, not
+are deliberately deferred per `docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md` §7 — they are valuable Phase-2+ investments, not
 Phase-0/1 scope, and are not represented as empty packages in the tree.
 
 ## Evaluation

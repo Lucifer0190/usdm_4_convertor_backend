@@ -4,14 +4,14 @@
 **Status:** architecture revised against published evidence; build in progress
 **Author:** Kirtikumar (Hexaware HTL) + Claude
 **Date:** 2026-09-16 · *(v0.2: 2026-08-14)*
-**Companion:** [`PLAN.md`](PLAN.md) (evidence + roadmap) · [`docs/`](docs/index.md) (reference)
+**Companion:** [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) (evidence + roadmap) · [`docs/`](docs/index.md) (reference)
 
 > **What changed in v0.3.** v0.2 was built on two numbers and one piece of arithmetic that
 > did not survive a literature review: a "~89% field / ~76% SoA market ceiling," and the
 > claim that two independent paths yield ~97–99% precision on their agreed set. Both are
 > corrected below. The *layered* architecture and the human-in-the-loop accuracy contract
 > survive intact; the mechanisms inside the layers change substantially. Full citations in
-> [`PLAN.md`](PLAN.md).
+> [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md).
 
 ---
 
@@ -376,7 +376,7 @@ files over 400 lines, hard-coded machine paths, and any field lacking evidence.
 
 ## 7. Phased plan
 
-Detail and exit criteria in [`PLAN.md` §6](PLAN.md). Summary:
+Detail and exit criteria in [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md` §6](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md). Summary:
 
 | Phase | Deliverable |
 |---|---|
@@ -434,7 +434,7 @@ nobody has re-checked.**
 
 ## Sources
 
-Full citation list in [`PLAN.md`](PLAN.md). Primary:
+Full citation list in [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md). Primary:
 Babaeipour et al. 2026 ([arXiv 2602.00052](https://arxiv.org/abs/2602.00052)) ·
 Kramer/MITRE ProtocolMiner ([MRA 14(3)](https://esmed.org/MRA/mra/article/view/7362)) ·
 [ExtractBench](https://arxiv.org/abs/2602.12247) ·

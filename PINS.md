@@ -1,6 +1,6 @@
 # Version pins
 
-Conformance is version-dependent in three independent ways (PLAN.md §1, conformance.md).
+Conformance is version-dependent in three independent ways (docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md §1, conformance.md).
 This page is the single place all three are recorded, so a future upgrade is a deliberate
 decision, not drift. Update this table whenever any of the three moves.
 

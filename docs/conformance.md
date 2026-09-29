@@ -110,7 +110,7 @@ remainder.
 Also pin the **errata revision**, not just the model and rule-set versions: 27 USDM v4.0
 errata have already been published, some flipping a rule's severity between ERROR and
 WARNING. Treat rule severity as data pulled from a pinned source, not a hardcoded constant.
-See [References](references.md) and [`../PLAN.md`](../PLAN.md) §1.
+See [References](references.md) and [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) §1.
 
 All three pins — `usdm4` package version, CORE rule-set version, and errata revision — are
 recorded together in [`../PINS.md`](../PINS.md), so a version bump is a visible, deliberate

@@ -2,7 +2,7 @@
 
 > **v0.3 note.** This page describes the ten-layer pipeline (see
 > [Architecture](architecture.md)). The implementation is being built in the phases
-> described in [`../PLAN.md`](../PLAN.md). As of Phase 6 (CP6-B, 2026-09-29), the
+> described in [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md). As of Phase 6 (CP6-B, 2026-09-29), the
 > implemented layers are L0 (ingest), L1–L2 (layout + multi-page SoA stitching), L3
 > (routing), L4 (sharded extraction, now C1–C6: metadata, design, eligibility,
 > objectives, estimands, organizations/sites), L5 (grounding), L6 (assurance +

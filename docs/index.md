@@ -12,7 +12,7 @@ field provenance-tagged, cross-checked, and triaged for human review.
 ## Why it exists — and what changed in v0.3
 
 A literature review of the published protocol-extraction and document-AI research
-([full findings](../PLAN.md)) corrected two assumptions the project started with: there is
+([full findings](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md)) corrected two assumptions the project started with: there is
 no single "~89%/~76% market ceiling" to beat (the two figures aren't a matched benchmark),
 and independent-looking extraction paths are not nearly as independent as assumed
 (measured cross-model error correlation is 0.74–0.82). The honest published state of the
@@ -71,12 +71,12 @@ uses independent deterministic methods, and an LLM member joins automatically vi
 - **[Development](development.md)** — setup, testing, and environment gotchas.
 - **[References](references.md)** — standards, tools, and prior art, with the accuracy
   claims each source actually supports.
-- **[`../PLAN.md`](../PLAN.md)** — the full evidence review and phased roadmap.
+- **[`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md)** — the full evidence review and phased roadmap.
 - **[`../DESIGN.md`](../DESIGN.md)** — the complete v0.3 technical design.
 
 ## Status
 
-Phases 0–6 of the v0.3 architecture (see [`../PLAN.md`](../PLAN.md) §6) are implemented:
+Phases 0–6 of the v0.3 architecture (see [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) §6) are implemented:
 one protocol PDF → a structurally-valid, quote-grounded USDM 4.0 study across seven domains
 (metadata, design, eligibility, objectives, estimands, organizations/sites, Schedule of
 Activities), routed through a section graph with prohibited-scope filtering, a Part 11 audit

@@ -1,7 +1,7 @@
 # References
 
 Full citation list and per-claim evidence grading (PROVEN vs CLAIMED/UNVALIDATED) is in
-[`../PLAN.md`](../PLAN.md). This page is the durable, curated subset.
+[`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md). This page is the durable, curated subset.
 
 ## Standards & governing bodies
 
@@ -56,7 +56,7 @@ Full citation list and per-claim evidence grading (PROVEN vs CLAIMED/UNVALIDATED
 ## Prior art (protocol → USDM) — with corrected scope caveats
 
 > **The two most-quoted accuracy figures in this space are not a matched benchmark, and
-> one is not about USDM at all.** Full derivation in `PLAN.md` §1.
+> one is not about USDM at all.** Full derivation in `docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md` §1.
 
 - **Babaeipour, Charest & Wright, 2026** (arXiv 2602.00052) — the source of "~89% field
   accuracy." A vendor-authored (Banting Health AI) study, **n=23 protocols**, on a
@@ -71,7 +71,7 @@ Full citation list and per-claim evidence grading (PROVEN vs CLAIMED/UNVALIDATED
 
 > Accuracy figures across teams are **not directly comparable** — different protocol sets,
 > entity scopes, and ground-truth methods. Any number we publish must carry its specific
-> scope and measurement method, per `PLAN.md` §8's calibration/eval methodology. There is
+> scope and measurement method, per `docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md` §8's calibration/eval methodology. There is
 > no shared industry benchmark for protocol → USDM conversion as of this writing.
 
 ## Documentation conventions used here
@@ -82,4 +82,4 @@ Full citation list and per-claim evidence grading (PROVEN vs CLAIMED/UNVALIDATED
 - **Prose docs** are Markdown, readable on any Git host, optionally served with
   [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/).
 - **Accuracy or benchmark claims** must cite a specific source and carry its scope caveat —
-  see `PLAN.md` for the standard this project now holds itself to.
+  see `docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md` for the standard this project now holds itself to.

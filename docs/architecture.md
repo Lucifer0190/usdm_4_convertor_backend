@@ -3,7 +3,7 @@
 USDM4-Assure is organized as ten layers (v0.3). Data flows top to bottom; each layer
 speaks only in the shared contracts from `usdm4_assure.contracts`, which is what lets the
 Assurance layer treat any extractor's output uniformly. Full evidence and rationale in
-[`../PLAN.md`](../PLAN.md) and [`../DESIGN.md`](../DESIGN.md).
+[`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) and [`../DESIGN.md`](../DESIGN.md).
 
 ```
 ┌─ L0 · SUBSTRATE ────────────────────────────────────────────┐

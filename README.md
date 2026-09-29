@@ -4,7 +4,7 @@
 > field grounded in a verifiable citation, scored by a calibrated confidence, and triaged
 > for human review with a 21 CFR Part 11 audit trail.
 
-**Status:** Phases 0–6 of the v0.3 architecture implemented (see [`PLAN.md`](PLAN.md) §6) ·
+**Status:** Phases 0–6 of the v0.3 architecture implemented (see [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) §6) ·
 **Python:** 3.12 · **License:** proprietary / internal (see [below](#license))
 
 USDM4-Assure reads a protocol document and produces a structurally-valid, quote-grounded
@@ -19,7 +19,7 @@ works).
 
 ## Why — and what changed
 
-A published-literature review ([`PLAN.md`](PLAN.md)) corrected two assumptions this
+A published-literature review ([`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md)) corrected two assumptions this
 project started with: there is no single "~89%/~76% market ceiling" to beat (the two
 figures traced to different, non-comparable studies), and independent-looking extraction
 paths are far more correlated than assumed (measured cross-model error correlation is
@@ -94,7 +94,7 @@ conda run -n usdm4 python -m usdm4_assure.cli convert-full data/fixtures/protoco
   document structure.
 - Dockerized (`docker/`, `docker-compose.yml` — `app` + an optional `review` service).
 
-See [`PLAN.md`](PLAN.md) §6 for the phased roadmap and [docs/scoreboard.md](docs/scoreboard.md)
+See [`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) §6 for the phased roadmap and [docs/scoreboard.md](docs/scoreboard.md)
 for measured numbers across the usdm_data corpus.
 
 ## Documentation
@@ -115,7 +115,7 @@ Full docs in [`docs/`](docs/index.md):
   citation scope.
 
 Design and strategy background: [`DESIGN.md`](DESIGN.md) (v0.3 technical design),
-[`PLAN.md`](PLAN.md) (the evidence review and roadmap behind it),
+[`docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md`](docs/ai/archive/PLAN-v0.3-evidence-and-roadmap.md) (the evidence review and roadmap behind it),
 [`spikes/SPIKE_LOG.md`](spikes/SPIKE_LOG.md).
 
 ## Conformance status (honest)

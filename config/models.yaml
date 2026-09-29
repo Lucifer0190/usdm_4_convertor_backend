@@ -1,5 +1,5 @@
 # OpenRouter model roles — evidence-based, frontier-LLM first.
-# See DEVPLAN.md §M for the accuracy-vs-cost analysis.
+# See docs/ai/archive/DEVPLAN-v0.3-tiered-tasks.md §M for the accuracy-vs-cost analysis.
 # Every role is one environment variable away from a different model (USDM4_MODEL_<ROLE>).
 #
 # Refreshed 2026-09-29 against the live OpenRouter catalog. Like-for-like: each role keeps
