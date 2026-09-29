@@ -99,7 +99,7 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 ### CP-D · Opus / high · SoA generality and AI reader (M2)
 | ID | Task | Done when |
 |---|---|---|
-| C-1 | SoA layouts still failing: cycle-based headers, duplicate visit names, empty visit columns, tables without ruling lines, reduced or amended schedules, several tables, footnote conditions | ≥ 85% SoA on train; then measured on held-out |
+| C-1 | SoA layouts. **Done so far:** header row roles, continuation pages, notes columns, PK tables, footnotes (visit recall 37->63% train; 204-protocol mark/uniqueness invariants 62/61% -> 89/97%). **Open:** epochs for tables without a period band (vaccine), tables without ruling lines, sub-study schedules | ≥ 85% SoA on train; then measured on held-out |
 | C-2 | **AI SoA reader**: vision model (Gemini 3.1 Pro, cross-checked by Sonnet 5.5) reads the table page images; the geometry reader is the independent check; disagreements go to review | disagreement rate reported |
 | C-3 | **Bake-off** on the same pages: geometry vs vision LLM vs Granite-Docling vs Docling (D3 approved) | one table, one winner per layout type |
 | C-4 | Sub-study schedules become separate timelines instead of one merged table | test on a two-schedule protocol |

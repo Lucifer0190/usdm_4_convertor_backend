@@ -100,3 +100,23 @@ The LLM lifts the fields it reads, but the overall score barely moves for two re
 2. **It adds wrong or extra items** (416 spurious items across the five studies), and those count against accuracy.
 
 Per study: C5091017 75.2%, C4601003 38.9%, C4891001 29.0%, C4891002 21.3%, C4891006 36.3%.
+
+## SoA reader fixes (C-1), 2026-09-29
+
+The rubric now keeps numeric tokens ("Day 1" is not "Day 15"), which lowered the earlier train baselines
+to 39.5% deterministic / 39.9% with LLM readers. After the SoA header, continuation, notes-column and
+PK-table fixes (deterministic, train set): **39.9%** overall, visit recall **37% -> 63%**, wrong epochs 28 -> 13.
+The remaining SoA gap on C4891002 / C4891006 is mostly reference quirks (the reference holds the
+superseded schedule from the amendment appendix), so it is left for the audited gold (Q-4).
+
+Invariants over all 204 protocol versions, before -> after:
+
+| SoA invariant | Before | After |
+|---|---:|---:|
+| every visit has a mark | 62% | **89%** |
+| visit names unique enough | 61% | **97%** |
+| visit names are real | 96% | 98% |
+| every visit has an epoch | 98% | 84% |
+
+The epoch drop is 27 vaccine-style protocols whose table has a visit-number row and no period band: the
+"epochs" were visit numbers before. Their epochs must come from outside the table (open item under C-1).
