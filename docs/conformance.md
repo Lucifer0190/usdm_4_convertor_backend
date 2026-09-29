@@ -2,18 +2,22 @@
 
 This page documents the validation gates, the current results on the reference fixture,
 and an honest analysis of what is and isn't achievable today — including the parts gated
-by the upstream assembler rather than by our extraction.
+by the upstream assembler rather than by our extraction. For measurements across the full
+usdm_data corpus (23 real protocols) rather than the one synthetic fixture below, see
+[docs/scoreboard.md](scoreboard.md) (task 7.1, `spikes/run_core_corpus.py`).
 
-> **v0.3 note — the assembler's real-world reliability is unmeasured, not proven broken.**
+> **v0.3 note — the "0 of 235" figure is now actually re-measured, not just flagged stale.**
 > Earlier internal notes cited a spike run in which zero of 235 real protocols in a test
-> corpus reached a successful assembly. That figure is **stale**: the currently vendored
-> `usdm4` source already contains fixes for two of the bugs that spike's findings doc lists
-> as open (`AmendmentsAssembler` no longer crashes on `None` enrollment; `AssemblerInput.soa`
-> now accepts a list of timelines, not just one). We do not currently know the real pass
-> rate on the pinned version we build on. **Phase 0 of [`../PLAN.md`](../PLAN.md) re-measures
-> it before any architecture decision leans on a number** — see that page for the plan, and
-> [`../DESIGN.md`](../DESIGN.md) §2 for how L7 hedges this with a per-section
-> `usdm4.builder` fallback and a reported "assembler reliance ratio" either way.
+> corpus reached a successful assembly. That figure was stale even when first flagged (the
+> currently vendored `usdm4` source already fixes two of the bugs that spike's findings doc
+> lists as open), and Phase 7's full-corpus run confirms it: **23/23** usdm_data protocols
+> assemble structurally-valid without an assembler error under the pinned version (`PINS.md`).
+> Every one of them still fails at least one d4k rule — real protocols are far more varied
+> than the single synthetic fixture this page otherwise reports against, and several rules
+> that never appear on the fixture (`DDF00213`, `DDF00247`) fail on 13-15 of the 23 real
+> studies. See [docs/scoreboard.md](scoreboard.md) for the corpus-wide rule-failure histogram;
+> those additional rules are not yet triaged into "our gap" vs. "upstream gap" the way the
+> fixture's rules below are — that triage is the natural next increment past this page.
 
 ## The three gates
 

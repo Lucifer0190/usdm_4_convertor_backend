@@ -81,9 +81,13 @@ conda run -n usdm4 python -m usdm4_assure.cli convert-full  data/fixtures/protoc
 conda run -n usdm4 python -m pytest tests/ -q
 ```
 
-The suite (18 tests) checks each domain's extraction against the fixtures' known ground
-truth, the SoA cross-validation, and that the full loop assembles a structurally-valid
-study. The first CORE-related import can be slow on a cold cache.
+The suite (445+ tests) checks each domain's extraction against synthetic ground truth, the
+SoA cross-validation and stitching, section-graph routing and scope filtering against real
+usdm_data corpus protocols (skipped when the gitignored corpus isn't cloned), the sanitizer/
+fallback/repair loop against the real usdm4 assembler and conformance rule engine, and that
+the full loop assembles a structurally-valid study. The first CORE-related import can be
+slow on a cold cache. `tests/conftest.py` also redirects the Part 11 audit store to a temp
+directory, so running the suite never writes into the real `data/audit/`.
 
 ## Environment gotchas
 

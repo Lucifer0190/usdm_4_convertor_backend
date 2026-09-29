@@ -4,15 +4,18 @@
 > field grounded in a verifiable citation, scored by a calibrated confidence, and triaged
 > for human review with a 21 CFR Part 11 audit trail.
 
-**Status:** working proof-of-concept, mid-revision to the v0.3 architecture · **Python:**
-3.12 · **License:** proprietary / internal (see [below](#license))
+**Status:** Phases 0–6 of the v0.3 architecture implemented (see [`PLAN.md`](PLAN.md) §6) ·
+**Python:** 3.12 · **License:** proprietary / internal (see [below](#license))
 
-USDM4-Assure reads a protocol document and produces a structurally-valid USDM 4.0 study
-spanning **metadata, study design, eligibility, objectives, interventions, and the
-Schedule of Activities** — with every extracted field provenance-tagged, cross-checked by
-independent methods, and triaged for human review. It runs with **no API keys and no real
-data**: the extraction ensemble uses independent deterministic methods, and an LLM member
-joins automatically via **OpenRouter** when a key is set (Claude direct also works).
+USDM4-Assure reads a protocol document and produces a structurally-valid, quote-grounded
+USDM 4.0 study spanning **metadata, study design, eligibility, objectives, estimands,
+organizations/sites, and the Schedule of Activities** — with every extracted field
+provenance-tagged, cross-checked by independent methods, routed through a deterministic
+section graph with prohibited-scope filtering, and triaged for human review through an
+HTMX certification UI backed by a 21 CFR Part 11 audit trail. It runs with **no API keys
+and no real data**: the extraction ensemble uses independent deterministic methods, and an
+LLM member joins automatically via **OpenRouter** when a key is set (Claude direct also
+works).
 
 ## Why — and what changed
 
@@ -58,22 +61,41 @@ conda run -n usdm4 python -m usdm4_assure.cli convert-full data/fixtures/protoco
 |---|---|
 | `usdm4 convert <pdf>` | Metadata-only spine (C1) → partial study + provenance review. |
 | `usdm4 convert-soa <pdf>` | Extract a Schedule of Activities → USDM ScheduleTimeline entities. |
-| `usdm4 convert-full <pdf>` | Full loop → one USDM 4.0 study across six domains. Add `--core` for the official gate. |
+| `usdm4 convert-full <pdf>` | Full loop → one USDM 4.0 study across seven domains. `--previous <pdf>` diffs and assembles an amendment; `--core` runs the official CDISC CORE gate; `--require-llm` fails loudly instead of silently falling back to deterministic-only. |
+| `usdm4 eval` | Score the pipeline against frozen field labels; writes the accuracy scoreboard. |
+| `usdm4 roles` | Print the active OpenRouter model-role configuration. |
 
 ## What's built
 
-- Foundation (`ingest`), Extraction (C1 metadata, C2 design, C3 eligibility, C4
-  objectives, SoA), the **Assurance** layer (ensemble + verifier + confidence), and
-  Integrity (assemble via data4knowledge + structural/d4k/CORE gates).
-- **OpenRouter** as the default LLM gateway (multi-model, tiered), with a direct-Anthropic
-  fallback and a drop-in SLM ensemble member (`--slm`).
-- 18 passing tests checking each domain against synthetic ground truth.
-- Dockerized (`docker/`) for portability.
+- **Foundation → Extraction (L0–L4):** PyMuPDF ingest with char-level geometry, a
+  multi-page Schedule-of-Activities stitcher with mechanical mark re-derivation, a
+  deterministic section graph (bookmarks or heading blocks) with prohibited-scope
+  filtering, and sharded two-pass extraction across six domains (C1 metadata, C2 design,
+  C3 eligibility, C4 objectives, C5 estimands, C6 organizations/sites) plus the SoA.
+- **Grounding + Assurance (L5–L6, the moat):** every LLM value carries a verbatim quote
+  resolved to page/character-offset/bbox by code, never the model; one uniform
+  ensemble + verifier + confidence path for every domain; completeness accounting
+  (expected-vs-found); a calibrated confidence model and an SSBC-corrected conformal
+  auto-accept threshold exist and are tested, but are not yet wired into the pipeline's
+  own triage — too few frozen labels today to calibrate one responsibly (see
+  [docs/pipeline.md](docs/pipeline.md)).
+- **Assembly → Validation (L7–L8):** assembled via the data4knowledge `Assembler`, with a
+  sanitizer that reports every input repair instead of applying it silently, per-section
+  fallback (a bad section is dropped and the rest salvaged, with the assembler-reliance
+  ratio reported), and a bounded (≤2-round) validate→re-extract→repair loop; structural,
+  d4k (offline), and optional CORE conformance gates.
+- **Certification (L9):** an HTMX review UI over a 21 CFR Part 11 append-only audit
+  trail — click-to-source crops, audited edits, certification, post-edit-distance
+  telemetry.
+- **OpenRouter** as the default LLM gateway (multi-model, tiered by role), with a
+  direct-Anthropic fallback and a drop-in SLM ensemble member (`--slm`).
+- 445+ passing tests checking each domain against synthetic ground truth, plus real
+  usdm_data corpus protocols where the section-graph/routing work depends on real
+  document structure.
+- Dockerized (`docker/`, `docker-compose.yml` — `app` + an optional `review` service).
 
-**In progress (v0.3, see [`PLAN.md`](PLAN.md) for the phased roadmap):** mandatory
-verbatim-quote grounding with code-side coordinate resolution, a multi-page Schedule-of-
-Activities stitcher, uniform assurance across all domains, a conformal confidence bound,
-completeness accounting, the provenance review UI, and a Part 11 audit trail.
+See [`PLAN.md`](PLAN.md) §6 for the phased roadmap and [docs/scoreboard.md](docs/scoreboard.md)
+for measured numbers across the usdm_data corpus.
 
 ## Documentation
 
@@ -83,7 +105,11 @@ Full docs in [`docs/`](docs/index.md):
 - [Pipeline & contracts](docs/pipeline.md) — data flow and the shared types.
 - [Module reference](docs/modules.md) — what every package does, current and planned.
 - [Conformance & limitations](docs/conformance.md) — the gates, current results, and an
-  honest analysis of what's gated by the upstream assembler.
+  honest analysis of what's gated by the upstream assembler versus fixable from our side.
+- [Scoreboard](docs/scoreboard.md) — measured auto-accept coverage, review burden,
+  realized error, and assembler reliance ratio across the usdm_data corpus.
+- [Review UI](docs/review.md) — the HTMX certification tool: click-to-source crops,
+  audited edits, post-edit-distance telemetry.
 - [Development](docs/development.md) — setup, testing, environment gotchas.
 - [References](docs/references.md) — standards, tools, and prior art, with corrected
   citation scope.
@@ -94,12 +120,16 @@ Design and strategy background: [`DESIGN.md`](DESIGN.md) (v0.3 technical design)
 
 ## Conformance status (honest)
 
-The full study is structurally valid and assembles with zero errors, but is **not yet
-CORE-clean**. A share of the residual findings is gated by the **upstream
-data4knowledge assembler** — though how large a share is currently *unmeasured*, not
-proven: an earlier "0 of 235 protocols assembled" figure is stale against the currently
-vendored assembler version. See [docs/conformance.md](docs/conformance.md) for the
-rule-by-rule breakdown and [`PLAN.md`](PLAN.md) Phase 0 for the re-measurement plan.
+The reference fixture is structurally valid, assembles with zero errors, and fails **5 of
+213** d4k rules (down from 12 before Phase 6) — **not yet CORE-clean**. Most of the
+reduction came from finding real bugs (a hidden exception-swallowing bug that made
+assembler errors invisible since Phase 0; an invalid sponsor-identifier scope; an
+out-of-range placeholder the assembler substitutes for a missing timing window), not from
+extracting more data. Two rules remain genuinely gated by the **upstream data4knowledge
+assembler or its bundled rule library**; one needs richer extraction this project
+deliberately does not attempt (see the trade-off it would require). See
+[docs/conformance.md](docs/conformance.md) for the rule-by-rule breakdown and
+[docs/scoreboard.md](docs/scoreboard.md) for the full-corpus numbers.
 
 ## License
 

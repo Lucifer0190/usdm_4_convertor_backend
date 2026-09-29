@@ -6,6 +6,32 @@ yet semantically versioned.
 
 ## [Unreleased]
 
+### Phase 7 complete — Scoreboard (v0.3.7, CP7)
+
+- **`spikes/run_core_corpus.py` (task 7.1)** — runs `run_full()` over every usdm_data
+  protocol under the pinned `usdm4`/d4k rule set (`PINS.md`), tallying structural/d4k/CORE
+  pass rates, auto-accept coverage, review burden, the assembler reliance ratio, and (from
+  the 4 held-out frozen-label studies only) realized error; publishes `docs/scoreboard.md`
+  and `spikes/reports/core_corpus.json`. `--core` runs the CDISC CORE gate too, when
+  `CDISC_LIBRARY_API_KEY` is set; without it every study's CORE result is honestly reported
+  `skipped`, matching `validate/gate.py`'s own per-study behavior — never a fabricated pass
+  rate for a gate that did not run.
+
+  **First real full-corpus measurement:** 23/23 usdm_data protocols assemble
+  structurally-valid with zero assembler errors under the pinned version — confirming
+  `docs/conformance.md`'s long-flagged-as-stale "0 of 235" figure is in fact stale, not a
+  live problem. Auto-accept coverage 8.9%, review burden 59.0%, assembler reliance ratio
+  99.4%. d4k pass rate is 0/23 (every real protocol fails at least one of 213 rules; the
+  reference fixture's own rate is the meaningful per-rule number — see conformance.md) —
+  several rules never seen on the fixture (`DDF00213`, `DDF00247`) fail on 13-15 of the 23
+  real studies and are not yet triaged into ours-to-fix vs. upstream, unlike the fixture's
+  rules.
+- **Docs refresh (task 7.2)** — README, `docs/index.md`, `docs/development.md`, and
+  `architecture.html`'s status line updated from Phase-0-era figures (18 tests, six domains,
+  "mid-revision") to the current state (445+ tests, seven domains, Phases 0-6 implemented).
+  `docs/conformance.md`'s stale-assembler-reliability note replaced with the actual Phase 7
+  measurement.
+
 ### Phase 6 complete — Hard domains + repair loop (v0.3.6, CP6-A–B)
 
 **Major milestone:** the reference fixture's failing d4k rules dropped from 12 to 5.

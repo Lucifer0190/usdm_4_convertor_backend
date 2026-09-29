@@ -1,6 +1,6 @@
 # Evaluation scoreboard
 
-Generated 2026-09-25T05:47:28+00:00. 4 labelled studies (62 field labels): Alexion_NCT04573309_Wilsons, CDISC_Pilot, EliLilly_NCT03421379_Diabetes, Sanofi_NCT03637764_Oncology.
+Generated 2026-09-29T06:37:53+00:00. 4 labelled studies (62 field labels): Alexion_NCT04573309_Wilsons, CDISC_Pilot, EliLilly_NCT03421379_Diabetes, Sanofi_NCT03637764_Oncology.
 
 > **Small-sample caveat.** DESIGN.md §5 anticipates ~1,200 field-level labels from ~20 protocols; only 62 exist today (task 4.1's 4 held-out studies). Numbers below describe this small set, not a general accuracy claim.
 
