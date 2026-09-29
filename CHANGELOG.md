@@ -6,6 +6,31 @@ yet semantically versioned.
 
 ## [Unreleased]
 
+### Accuracy fixes after the first real Pfizer run (unreleased)
+
+A real run on Pfizer C5091017 v2 scored about 5% against a hand-corrected reference
+even though the LLMs answered correctly: the pipeline overrode or dropped their answers.
+Fixes, each its own commit:
+
+- **LLM call contract** — an empty completion is an error (retried once with a doubled
+  budget, raised if still empty) and is never cached; pass-2 budget 1,600 → 6,000 tokens.
+- **Section slots + furniture stripping** (`sections/slots.py`) — each domain reads its own
+  title-matched section with running headers/footers removed; a missing slot returns `None`
+  and raises a finding instead of reading the whole protocol.
+- **Objectives table reader** (`extract/objectives_table.py`) — objective, endpoints and
+  estimand stay together by table row.
+- **Eligibility by sequential numbering** in the inclusion/exclusion sections.
+- **Assurance** — source-independence groups (regex members are one vote, each LLM its own),
+  deterministic sanity validators (`assure/sanity.py`), deterministic-only values can no longer
+  self-certify. Two tests that encoded "agreement = certainty" were updated on purpose.
+- **Pipeline** — grounded LLM readers run in the first pass on the narrow windows; new
+  `armNames` design field; SoA table search restricted to the schedule-of-activities pages.
+- **Models** refreshed like-for-like (Sonnet 5.5, GPT-6 Sol, Opus 5.5, Gemini 3.1 Pro).
+
+Measured on the same study and rubric: 5.4% → 40% of 130 reference items, estimands 0 → 5 of
+5, criteria 0 → 18 of 19, arms 0 → 2 of 2, phase correct, d4k findings 45 → 21. The Schedule
+of Activities (55% of the rubric) is still the main gap.
+
 ### Phase 7 complete — Scoreboard (v0.3.7, CP7)
 
 - **`spikes/run_core_corpus.py` (task 7.1)** — runs `run_full()` over every usdm_data
