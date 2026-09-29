@@ -212,6 +212,13 @@ def assemble(data: dict, *, name: str = "USDM4-Assure", version: str = "0.1.0"
         for failure in failures:
             outcome.findings.append(_finding(Severity.ERROR, "objectives",
                                              f"Builder fallback could not rebuild {failure}."))
+    if "soa" not in outcome.dropped:
+        from usdm4_assure.assemble.soa import repair_timeline
+        _, design = _first_design(asm)
+        if design is not None:
+            for note in repair_timeline(asm._builder, design.scheduleTimelines,
+                                        design.encounters, design.epochs):
+                outcome.findings.append(_finding(Severity.INFO, "soa", note))
     outcome.assembler_sections = [s for s in supplied if s not in outcome.dropped]
     outcome.study_ok = True
     outcome.wrapper = asm.wrapper(name=name, version=version).model_dump(by_alias=True)

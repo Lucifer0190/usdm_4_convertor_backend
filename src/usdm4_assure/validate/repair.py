@@ -74,13 +74,23 @@ RULE_MAP: dict[str, RepairAction] = {
                      note="the sponsor's organisation type is not extracted and is recorded "
                           "as CDISC 'Unknown', which the organisation-type codelist lacks "
                           "(task 6.4)"),
-    "DDF00006": _gap("soa", "timings", note="timing windows are not extracted (task 6.5)"),
-    "DDF00025": _gap("soa", "timings", note="timing windows are not extracted (task 6.5)"),
-    "DDF00031": _gap("soa", "timings", note="relative timing anchors are not extracted (task 6.5)"),
-    "DDF00153": _gap("soa", "plannedDuration",
-                     note="the main timeline's planned duration is not extracted (task 6.5)"),
+    "DDF00031": _gap("soa", "timings",
+                     note="the d4k rule engine's own DDF00031 check compares Timing.type.decode "
+                          "against the short string 'Fixed Reference', but the anchor timing's "
+                          "real decode is 'Fixed Reference Timing Type' (the same code/decode "
+                          "mismatch DDF00025's fix history describes) -- a rule-library bug, "
+                          "not an extraction gap; confirmed against the live d4k engine"),
     "DDF00075": _gap("soa", "activities",
-                     note="activities are not coded to procedures or biomedical concepts"),
+                     note="activities are not coded to procedures or biomedical concepts. Tried "
+                          "(task 6.5): offering the activity's own name as a biomedical concept "
+                          "gets a real exact-name match sometimes (e.g. 'Informed Consent' "
+                          "against the bundled CDISC BC library), but TimelineAssembler's own "
+                          "procedure-creation path also mints a Procedure for every such name "
+                          "with the same hardcoded placeholder LOINC code '12345', which trades "
+                          "this WARNING for a fabricated-code ERROR (DDF00035) and a biomedical- "
+                          "concept-library data-quality WARNING (DDF00236) -- both worse than "
+                          "the gap they would silence, so this stays a documented gap rather "
+                          "than manufactured data"),
     "DDF00101": _gap("design", "interventions",
                      note="procedures referencing interventions are not extracted"),
     "DDF00087": _gap("soa", "ordering", note="linked-list ordering is emitted by the assembler"),

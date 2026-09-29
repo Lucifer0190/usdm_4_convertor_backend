@@ -49,10 +49,10 @@ def test_rule_map_actions_are_consistent():
 
 def test_known_gaps_spend_no_rounds_and_are_explained():
     rec = _Recorder({}, [])
-    out = repair_loop(["DDF00140", "DDF00153"], {"eligibility": _elig()},
+    out = repair_loop(["DDF00140", "DDF00101"], {"eligibility": _elig()},
                       reextract=rec.reextract, revalidate=rec.revalidate)
     assert out.rounds == 0 and rec.reextract_calls == [] and rec.revalidations == 0
-    assert out.unresolved == ["DDF00140", "DDF00153"]
+    assert out.unresolved == ["DDF00101", "DDF00140"]
     assert all(f.severity is Severity.WARNING and "known gap" in f.message
                for f in out.findings)
 

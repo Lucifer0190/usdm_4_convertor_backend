@@ -151,3 +151,53 @@ def test_sai_activities_match_ground_truth(graded):
         # find the encounter whose activity set matches; assert one does
         assert any(set(acts) == expected for acts in by_enc.values()), (
             f"no SAI matches visit {gt['visits'][vi]} expected {expected}")
+
+
+# --- task 6.5: real d4k conformance around windows/duration/linking/BC ------------------ #
+def test_build_soa_timing_repairs_and_bc_surrogate(graded):
+    """Verified against the real d4k rule engine (task 6.5): the assembler's
+    own '???' placeholder for an out-of-range window index used to fail
+    DDF00006/DDF00025 on every Timing; plannedDuration was hardcoded None
+    (DDF00153); Encounter/StudyEpoch were never double-linked (DDF00087/88)."""
+
+    ag, _gt = graded
+    result = build_soa(ag)
+    assert result["assembler_errors"] == []
+    assert any("plannedDuration" in n for n in result["repair_notes"])
+    assert any("encounters" in n for n in result["repair_notes"])
+    assert any("epochs" in n for n in result["repair_notes"])
+
+    tl = result["entities"]["timelines"][0]
+    assert tl.plannedDuration is not None and tl.plannedDuration.quantity.value > 0
+    for t in tl.timings:
+        assert not (bool(t.windowLabel) ^ bool(t.windowLower) ^ bool(t.windowUpper)) or (
+            bool(t.windowLabel) and bool(t.windowLower) and bool(t.windowUpper))
+    encounters = result["entities"]["encounters"]
+    assert encounters[0].previousId is None
+    assert encounters[-1].nextId is None
+    assert encounters[1].previousId == encounters[0].id
+
+
+def test_full_study_timing_rules_pass_against_real_d4k():
+    import json
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "spikes"))
+    from make_full_fixture import build as build_full
+
+    from usdm4_assure.assemble.study import build_full_study
+    from usdm4_assure.extract.design import DesignExtract
+    from usdm4_assure.extract.soa.crossval import cross_validate as cv
+    from usdm4_assure.extract.soa.methods import extract_pdfplumber as epp
+    from usdm4_assure.extract.soa.methods import extract_pymupdf as epm
+
+    pdf = build_full()
+    grid = cv([epp(pdf), epm(pdf)])
+    design = DesignExtract(intervention_model="Parallel",
+                           arms=[{"name": "A", "type": "Experimental"},
+                                 {"name": "Placebo", "type": "Placebo Comparator"}])
+    study = build_full_study([], design, grid)
+    assert study["ok"]
+    d4k = study["validation"]["d4k"]
+    for rule in ("DDF00006", "DDF00025", "DDF00087", "DDF00088", "DDF00153"):
+        assert rule not in d4k["failed_rules"], json.dumps(d4k, indent=2)[:2000]
