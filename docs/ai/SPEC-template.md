@@ -4,7 +4,7 @@
 One or two sentences: what changes and why.
 
 ## Context
-What exists today; links to relevant files, docs and PLAN.md / DEVPLAN.md sections.
+What exists today; links to relevant files, docs and the PLAN.md task ID. A spec details one PLAN.md task; it is not a new plan.
 
 ## Constraints
 Non-negotiables (accuracy contract, grounding, pins, file-size guard, no new dependencies).

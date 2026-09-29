@@ -14,6 +14,6 @@ description: End-of-session maintenance of docs/ai (STATE, PLANS, DECISIONS, arc
 4. If a command, convention or structure changed, make the minimal edit to `CLAUDE.md` or the relevant
    `.claude/rules/` file.
 5. Enforce caps: CLAUDE.md 150 lines, STATE.md 60, PLANS.md 60, DECISIONS.md 40 entries.
-6. There is no external tracker. Note which PLAN.md / DEVPLAN.md item moved, if any, and remind the user to
-   update it by hand.
+6. PLAN.md is the one plan; do not create others. Note which PLAN.md task ID moved, if any, and remind the
+   user to move its Trello card by hand.
 7. Show the diff of `docs/ai` and `CLAUDE.md` changes. Do not commit.

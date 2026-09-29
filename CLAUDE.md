@@ -52,13 +52,15 @@ CI (`.github/workflows/ci.yml`) runs ruff check, guard.py, pytest, in that order
 
 ## Project memory
 Shared, versioned state lives in `docs/ai/`: `STATE.md` (per-machine snapshot, gitignored), `PLANS.md`
-(index of active work only), `DECISIONS.md`, `plans/`, `archive/`, `SPEC-template.md`. `PLAN.md` and
-`DEVPLAN.md` at the repo root remain the long-term roadmap; they are not mirrored into `docs/ai/`.
-There is no external tracker.
+(index of active work only), `DECISIONS.md`, `plans/`, `archive/`, `SPEC-template.md`.
+**`PLAN.md` at the repo root is the ONE plan** for the core AI and the backend. Never create another plan
+file: add work to PLAN.md as a task ID with a model tag and a "done when". `docs/ai/archive/` holds retired
+plans (read-only history). Backlog tracker: Trello board "USDM_4", one card per PLAN.md task ID.
 
 ## Session protocol
-- Start: STATE.md is injected by the SessionStart hook. Read the relevant lines of `docs/ai/PLANS.md` and the
-  active plan file in `docs/ai/plans/`.
+- Start: STATE.md is injected by the SessionStart hook. Read `docs/ai/PLANS.md`, then the task's section in
+  `PLAN.md`. Tell the user which model and thinking level the task's checkpoint calls for, and announce each
+  checkpoint boundary so they can switch. Commit after every task.
 - Trivial change: inspect, implement, `/check`. Larger change: `/plan-task`, get approval, `/implement-plan`,
   `/check`, then the `reviewer` agent (or `/code-review`). If corrected twice on the same issue, stop and
   restart with a better prompt.

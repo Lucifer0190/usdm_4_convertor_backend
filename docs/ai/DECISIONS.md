@@ -1,6 +1,7 @@
 # DECISIONS (newest first; never delete, mark superseded)
 All entries below are inferred from the repo docs on 2026-09-29: inferred - confirm.
 
+- 2026-09-29 | One plan only: PLAN.md at repo root; old PLAN/DEVPLAN/ROAD_TO_89 archived in docs/ai/archive | Too many overlapping plans inside and outside the repo | Alt: keep several | -
 - 2026-09-29 | Review UI is localhost-only with no auth | Part 11 PoC scope (docs/review.md) | Alternatives: add auth | -
 - 2026-09-29 | Proprietary license despite GPL-3.0 `usdm4` dependency | Internal use is not distribution (README) | Alt: open-source | -
 - 2026-09-29 | Neo4j graph layer deferred | Not needed by any scheduled phase (docker-compose.yml, PLAN.md) | Alt: schedule now | -
