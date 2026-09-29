@@ -28,6 +28,7 @@ curl -X POST "http://localhost:8080/v1/convert?include_report=true" -F "file=@pr
 | 200 | body is the USDM 4.0 JSON (or `{"usdm", "report"}` with `include_report=true`) |
 | 400 | not a PDF, or empty |
 | 401 | `USDM4_API_KEYS` is set and `X-API-Key` is missing or wrong |
+| 503 | the LLM pipeline is required but no `OPEN_ROUTER_KEY` is configured |
 | 413 | larger than `USDM4_MAX_UPLOAD_MB` |
 | 422 | the core ran but could not assemble a USDM document (details in the body) |
 | 504 | exceeded `USDM4_TIMEOUT_S` |
@@ -42,8 +43,8 @@ curl -X POST "http://localhost:8080/v1/convert?include_report=true" -F "file=@pr
 | `USDM4_MAX_UPLOAD_MB` | 60 | |
 | `USDM4_MAX_CONCURRENT` | 2 | conversions at once; others wait |
 | `USDM4_TIMEOUT_S` | 900 | per request |
-| `OPEN_ROUTER_KEY` | unset | enables the LLM readers |
-| `USDM4_NO_LLM` | unset | set to force the deterministic path |
+| `OPEN_ROUTER_KEY` | unset | **required**: the LLM pipeline is the default; without it the API answers 503 |
+| `USDM4_ALLOW_NO_LLM` | unset | set to `1` to allow deterministic-only conversion (offline / tests) |
 
 ## Things to know before deploying
 

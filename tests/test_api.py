@@ -16,8 +16,11 @@ PDF = b"%PDF-1.4\n%fake\n"
 class FakeConverter:
     name = "fake"
 
-    def __init__(self, fail: bool = False):
-        self.fail, self.calls = fail, 0
+    def __init__(self, fail: bool = False, llm: bool = True):
+        self.fail, self.calls, self._llm = fail, 0, llm
+
+    def llm_ready(self) -> bool:
+        return self._llm
 
     def convert(self, pdf_path: Path, work_dir: Path) -> ConversionResult:
         self.calls += 1
@@ -73,11 +76,26 @@ def test_api_keys_are_enforced_when_configured(monkeypatch):
 
 def test_health_and_version():
     client = TestClient(create_app(FakeConverter()))
-    assert client.get("/health").json() == {"status": "ok", "converter": "fake"}
+    assert client.get("/health").json() == {"status": "ok", "converter": "fake", "llm": True}
     assert client.get("/v1/version").json()["converter"] == "fake"
 
 
-def test_the_real_core_converts_the_synthetic_protocol_end_to_end():
+def test_the_llm_pipeline_is_required_by_default():
+    conv = FakeConverter(llm=False)
+    client = TestClient(create_app(conv))
+    r = _post(client)
+    assert r.status_code == 503 and "OPEN_ROUTER_KEY" in r.json()["detail"]
+    assert conv.calls == 0
+    assert client.get("/health").json()["llm"] is False
+
+
+def test_deterministic_only_must_be_allowed_explicitly(monkeypatch):
+    monkeypatch.setenv("USDM4_ALLOW_NO_LLM", "1")
+    assert _post(TestClient(create_app(FakeConverter(llm=False)))).status_code == 200
+
+
+def test_the_real_core_converts_the_synthetic_protocol_end_to_end(monkeypatch):
+    monkeypatch.setenv("USDM4_ALLOW_NO_LLM", "1")      # the test suite runs without an LLM key
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "spikes"))
     from make_full_fixture import build
 

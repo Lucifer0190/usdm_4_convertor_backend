@@ -51,6 +51,13 @@ class CoreConverter:
 
     name = "usdm4-assure"
 
+    def llm_ready(self) -> bool:
+        """True when the LLM readers will run: a key is configured and the LLM is not disabled."""
+        import os
+
+        from usdm4_assure.llm.config import openrouter_key
+        return bool(openrouter_key()) and not os.environ.get("USDM4_NO_LLM")
+
     def convert(self, pdf_path: Path, work_dir: Path) -> ConversionResult:
         from usdm4_assure.pipeline import run_full
 
@@ -59,6 +66,7 @@ class CoreConverter:
         review_path = work_dir / "review.json"
         review = json.loads(review_path.read_text(encoding="utf-8")) if review_path.exists() else {}
         report = {
+            "llm": self.llm_ready(),
             "run_id": result.run_id,
             "source_sha256": result.source_sha256,
             "decision_summary": review.get("decision_summary", {}),

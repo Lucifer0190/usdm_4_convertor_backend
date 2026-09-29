@@ -6,6 +6,9 @@
 
 Configuration (environment variables):
 
+    OPEN_ROUTER_KEY       the LLM pipeline is the default and is REQUIRED: without a key the
+                          service answers 503 instead of returning a thin deterministic result.
+    USDM4_ALLOW_NO_LLM    set to 1 to allow deterministic-only conversion (tests, offline use)
     USDM4_API_KEYS        comma-separated keys; when set, requests need ``X-API-Key``.
                           When unset the service is open (logged at startup) - do not expose it.
     USDM4_MAX_UPLOAD_MB   default 60
@@ -48,6 +51,14 @@ def create_app(converter: Converter | None = None) -> FastAPI:
     max_bytes = _int_env("USDM4_MAX_UPLOAD_MB", 60) * 1024 * 1024
     timeout_s = _int_env("USDM4_TIMEOUT_S", 900)
     gate = asyncio.Semaphore(max(1, _int_env("USDM4_MAX_CONCURRENT", 2)))
+    allow_no_llm = bool(os.environ.get("USDM4_ALLOW_NO_LLM"))
+
+    def llm_ready() -> bool:
+        return bool(getattr(conv, "llm_ready", lambda: True)())
+
+    if not allow_no_llm and not llm_ready():
+        log.warning("The LLM pipeline is required but no OPEN_ROUTER_KEY is configured: "
+                    "conversions will be refused with 503.")
     if not keys:
         log.warning("USDM4_API_KEYS is not set: the API is open. Do not expose it publicly.")
 
@@ -61,7 +72,7 @@ def create_app(converter: Converter | None = None) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict:
-        return {"status": "ok", "converter": conv.name}
+        return {"status": "ok", "converter": conv.name, "llm": llm_ready()}
 
     @app.get("/v1/version")
     def version() -> dict:
@@ -69,6 +80,11 @@ def create_app(converter: Converter | None = None) -> FastAPI:
 
     @app.post("/v1/convert", dependencies=[Depends(require_key)])
     async def convert(file: UploadFile = File(...), include_report: bool = False):
+        if not allow_no_llm and not llm_ready():
+            raise HTTPException(
+                status_code=503,
+                detail="The LLM pipeline is required but no OPEN_ROUTER_KEY is configured "
+                       "(set it, or USDM4_ALLOW_NO_LLM=1 to allow deterministic-only conversion).")
         with tempfile.TemporaryDirectory(prefix="usdm4-") as tmp:
             work = Path(tmp)
             pdf = work / "protocol.pdf"

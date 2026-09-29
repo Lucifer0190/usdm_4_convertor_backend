@@ -28,7 +28,7 @@ services:
       - OPEN_ROUTER_KEY=${OPEN_ROUTER_KEY:-}
       - USDM4_API_KEYS=${USDM4_API_KEYS:-}
       - USDM4_MAX_CONCURRENT=${USDM4_MAX_CONCURRENT:-2}
-      - USDM4_NO_LLM=${USDM4_NO_LLM:-}
+      - USDM4_ALLOW_NO_LLM=${USDM4_ALLOW_NO_LLM:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 30s
