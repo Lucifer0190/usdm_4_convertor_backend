@@ -30,9 +30,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from usdm4_assure.eval.rubric import score_study, view_of  # noqa: E402
-
-STUDIES = ["C5091017", "C4601003", "C4891001", "C4891002", "C4891006", "C4891023",
-           "C4891024", "C4891026"]
+from usdm4_assure.eval.split import (  # noqa: E402
+    HeldOutGuard,
+    check_explicit,
+    log_heldout_run,
+    studies_for,
+)
 
 
 def find_reference(ddf: Path, study: str) -> Path:
@@ -82,20 +85,30 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--ddf-root", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
-    ap.add_argument("--studies", nargs="*", default=STUDIES)
+    ap.add_argument("--set", dest="which", choices=["train", "heldout", "all"], default="train",
+                    help="train (default, safe to tune on), heldout (frozen test), or all")
+    ap.add_argument("--studies", nargs="*", help="explicit study ids (overrides --set)")
+    ap.add_argument("--confirm-heldout", action="store_true",
+                    help="required to score the held-out studies; the run is logged")
     ap.add_argument("--llm", action="store_true", help="enable the LLM readers (costs money)")
     ap.add_argument("--reuse", action="store_true",
                     help="score existing <out>/<study>/study.usdm.json instead of re-running")
     ap.add_argument("--publish", action="store_true", help="also write spikes/reports/benchmark.md")
     args = ap.parse_args()
 
+    try:
+        studies = (check_explicit(args.studies, confirm_heldout=args.confirm_heldout)
+                   if args.studies else studies_for(args.which, confirm_heldout=args.confirm_heldout))
+    except HeldOutGuard as exc:
+        print(f"refused: {exc}")
+        return 2
     if not args.llm:
         os.environ["USDM4_NO_LLM"] = "1"
     from usdm4_assure.pipeline import run_full
 
     args.out.mkdir(parents=True, exist_ok=True)
     rows = []
-    for study in args.studies:
+    for study in studies:
         ref_path = find_reference(args.ddf_root, study)
         reference = json.loads(ref_path.read_text(encoding="utf-8"))
         version = int(re.findall(r"\d+", str(view_of(reference)["scalars"].get("version", "0")))[0])
@@ -122,6 +135,8 @@ def main() -> int:
     md = render_md(rows, mode)
     (args.out / "benchmark.json").write_text(json.dumps(rows, indent=2), encoding="utf-8")
     (args.out / "benchmark.md").write_text(md, encoding="utf-8")
+    total = sum(r["matched"] for r in rows) / max(1, sum(r["reference"] + r["spurious"] for r in rows))
+    log_heldout_run(ROOT / "spikes" / "reports" / "heldout_runs.jsonl", studies, mode, total)
     if args.publish:
         (ROOT / "spikes" / "reports" / "benchmark.md").write_text(md, encoding="utf-8")
     print("\n" + md)
