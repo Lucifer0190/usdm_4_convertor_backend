@@ -118,3 +118,28 @@ def test_two_independent_llm_families_agreeing_can_auto_accept():
                           model_id="openai/gpt-6-sol")
     out = assure([a, b], _doc(text), ["sponsorName"], domain="metadata")[0]
     assert out.methods_agree and out.decision is Decision.AUTO_ACCEPT
+
+
+# --- arm names ------------------------------------------------------------------------ #
+@pytest.mark.parametrize("name,ok", [
+    ("Ibuzatrelvir", True), ("Placebo", True), ("Treatment arm", True), ("Arm A: Drug 300 mg", True),
+    ("600 Mg", False), ("\u20111", False), ("Date", False), ("IRBs/ECs", False),
+    ("Any Protocol Administrative Change Letter(S)", False), ("", False), ("12", False),
+])
+def test_arm_name_plausibility(name, ok):
+    from usdm4_assure.assure.sanity import arm_name_ok
+    assert arm_name_ok(name) is ok
+
+
+def test_arm_names_field_is_checked_name_by_name():
+    assert check("design", "armNames", "Ibuzatrelvir; Placebo", "").status == "neutral"
+    assert check("design", "armNames", "600 Mg; \u20111", "").status == "failed"
+    assert check("design", "armNames", "Ibuzatrelvir; Date", "").status == "failed"
+
+
+def test_regex_arm_parse_drops_verbs_and_dosing_tails():
+    from usdm4_assure.extract.design import _parse_arms
+    text = ("Participants will be randomized (1:1) to receive ibuzatrelvir or placebo "
+            "orally twice daily for 5 days (10 doses total). After that they are followed.")
+    arms, _ = _parse_arms(text)
+    assert [a["name"].lower() for a in arms] == ["ibuzatrelvir", "placebo"]

@@ -13,10 +13,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from usdm4_assure.assure.sanity import arm_name_ok
 from usdm4_assure.contracts import Document, FieldCandidate, GroundedCandidate
 from usdm4_assure.llm.base import LLM
 
-DESIGN_FIELDS = ["studyType", "interventionModel"]
+DESIGN_FIELDS = ["studyType", "interventionModel", "armNames"]
 
 _MODEL_RE = re.compile(
     r"\b(parallel|cross[- ]?over|single[- ]?group|factorial|sequential)\b", re.IGNORECASE)
@@ -45,6 +46,17 @@ def _arm_type(name: str) -> str:
     return "Experimental"
 
 
+def arms_from_names(value: str) -> list[dict]:
+    """Arm dicts from a ``"A; B"`` list (the ``armNames`` field), plausible names only."""
+    seen, out = set(), []
+    for raw in re.split(r"[;|]", value or ""):
+        name = re.sub(r"\s+", " ", raw).strip(" .:;")
+        if arm_name_ok(name) and name.lower() not in seen:
+            seen.add(name.lower())
+            out.append({"name": name, "type": _arm_type(name)})
+    return out
+
+
 def _parse_arms(text: str) -> tuple[list[dict], str]:
     """Find the arm enumeration and split into arms.
 
@@ -67,7 +79,13 @@ def _parse_arms(text: str) -> tuple[list[dict], str]:
     for p in parts:
         name = re.sub(r"\s+", " ", p).strip(" .:;")
         name = re.sub(r"^(the|a|an)\s+", "", name, flags=re.IGNORECASE).strip()
-        if 2 <= len(name) <= 60 and not name.lower().startswith(("approximately",)):
+        # "to receive X" -> X ; "X orally twice daily for 5 days" -> X
+        name = re.sub(r"^(?:to\s+)?(?:receive|receiving|be given|be treated with)\s+", "", name,
+                      flags=re.IGNORECASE).strip()
+        name = re.split(r"\s+(?:orally|intravenously|subcutaneously|once|twice|daily|"
+                        r"for\s+\d+|at\s+a\s+dose|\()", name, maxsplit=1,
+                        flags=re.IGNORECASE)[0].strip(" .:;")
+        if arm_name_ok(name) and not name.lower().startswith(("approximately",)):
             arms.append({"name": name.title() if name.islower() else name,
                          "type": _arm_type(name)})
     # dedupe preserving order
@@ -107,7 +125,11 @@ def extract_design(doc: Document, metadata_vals: dict, llm: LLM) -> tuple[
         # confidence: multiple arms cleanly parsed from an explicit ratio => higher
         ratio = bool(re.search(r"\b\d+:\d+(:\d+)+\b", text))
         de.arms_confidence = 0.8 if (ratio and len(arms) >= 2) else 0.55
-        de.arms_decision = "auto_accept" if de.arms_confidence >= 0.8 else "review"
+        # A regex-parsed arm list never certifies itself: it is one candidate for the
+        # ``armNames`` field, and only independent evidence can auto-accept it.
+        de.arms_decision = "review"
+        cands.append(FieldCandidate("armNames", "; ".join(a["name"] for a in arms),
+                                    "design-heuristic", src, 1))
     return cands, de
 
 

@@ -66,10 +66,14 @@ def _ffill(vals: list[str]) -> list[str]:
     return out
 
 
-def extract_pdfplumber(pdf_path: str | Path) -> SoAGrid:
+def extract_pdfplumber(pdf_path: str | Path, pages: list[int] | None = None) -> SoAGrid:
+    """First table with visits and activities. ``pages`` (1-indexed) restricts the
+    search to the schedule-of-activities pages the section graph located."""
     import pdfplumber
     with pdfplumber.open(str(pdf_path)) as pdf:
-        for page in pdf.pages:
+        for number, page in enumerate(pdf.pages, start=1):
+            if pages is not None and number not in pages:
+                continue
             tables = page.extract_tables()
             for t in tables:
                 g = _parse_rows(t, "pdfplumber")
@@ -78,11 +82,14 @@ def extract_pdfplumber(pdf_path: str | Path) -> SoAGrid:
     return SoAGrid(method="pdfplumber")
 
 
-def extract_pymupdf(pdf_path: str | Path) -> SoAGrid:
+def extract_pymupdf(pdf_path: str | Path, pages: list[int] | None = None) -> SoAGrid:
+    """First table with visits and activities, optionally only on ``pages`` (1-indexed)."""
     import pymupdf
     doc = pymupdf.open(str(pdf_path))
     try:
-        for page in doc:
+        for number, page in enumerate(doc, start=1):
+            if pages is not None and number not in pages:
+                continue
             finder = page.find_tables()
             for t in finder.tables:
                 g = _parse_rows(t.extract(), "pymupdf")

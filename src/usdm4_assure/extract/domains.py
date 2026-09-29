@@ -69,14 +69,24 @@ def objectives_candidates(o: c4.ObjectivesExtract) -> list[FieldCandidate]:
     return cands
 
 
-def _grounded(module, doc: Document, llm: LLM | None) -> list:
-    if llm is None or not getattr(llm, "available", False):
+def _llm_list(escalate) -> list[LLM]:
+    if escalate is None:
         return []
-    return module.extract_llm_grounded(doc, llm)
+    return list(escalate) if isinstance(escalate, Sequence) else [escalate]
+
+
+def _grounded(module, doc: Document, escalate) -> list:
+    """Grounded two-pass candidates from every available escalation member."""
+    out: list = []
+    for llm in _llm_list(escalate):
+        if getattr(llm, "available", False):
+            out += module.extract_llm_grounded(doc, llm)
+    return out
 
 
 def extract_domain(domain: str, doc: Document, members: Sequence[LLM],
-                   meta: dict | None = None, escalate: LLM | None = None) -> DomainResult:
+                   meta: dict | None = None, escalate=None,
+                   scoped: dict | None = None) -> DomainResult:
     """Extract and assure one domain over ``doc``.
 
     Args:
@@ -84,21 +94,36 @@ def extract_domain(domain: str, doc: Document, members: Sequence[LLM],
         doc: The (possibly scoped) document to read.
         members: The run's ensemble LLM members (``[0]`` is the primary).
         meta: Assured metadata values, used by the design extractor.
-        escalate: Optional extra grounded LLM member for this call only.
+        escalate: One grounded two-pass LLM member, or several, for this call.
+            ``run_full`` passes the ``extract`` (and ``extract_alt``) roles here on
+            the first pass; the repair loop passes ``hard_reasoning``.
+        scoped: Section-level inputs found by ``sections/slots.py``:
+            ``inclusion_doc`` / ``exclusion_doc`` (eligibility) and ``rows``
+            (objectives-table rows). Absent keys fall back to reading ``doc``.
     """
+    scoped = scoped or {}
     if domain == "metadata":
         cands = c1.extract_all(doc, members) + _grounded(c1, doc, escalate)
         return DomainResult(assure(cands, doc, c1.FIELDS, domain=domain))
     if domain == "design":
         cands, extract = c2.extract_design(doc, meta or {}, members[0])
         cands = cands + _grounded(c2, doc, escalate)
-        return DomainResult(assure(cands, doc, c2.DESIGN_FIELDS, domain=domain), extract)
+        assured = assure(cands, doc, c2.DESIGN_FIELDS, domain=domain)
+        arms = next((f for f in assured if f.field == "armNames"), None)
+        if arms is not None and arms.value:
+            parsed = c2.arms_from_names(arms.value)
+            if parsed:                    # the assured arm list replaces the regex one
+                extract.arms, extract.arms_source = parsed, arms.value
+                extract.arms_confidence = arms.confidence
+                extract.arms_decision = arms.decision.value
+        return DomainResult(assured, extract)
     if domain == "eligibility":
-        extract = c3.extract_eligibility(doc)
+        extract = c3.extract_eligibility(doc, scoped.get("inclusion_doc"),
+                                         scoped.get("exclusion_doc"))
         cands = eligibility_candidates(extract) + _grounded(c3, doc, escalate)
         return DomainResult(assure(cands, doc, ELIGIBILITY_FIELDS, domain=domain), extract)
     if domain == "objectives":
-        extract = c4.extract_objectives(doc)
+        extract = c4.extract_objectives(doc, rows=scoped.get("rows"))
         cands = objectives_candidates(extract) + _grounded(c4, doc, escalate)
         return DomainResult(assure(cands, doc, OBJECTIVES_FIELDS, domain=domain), extract)
     raise ValueError(f"unknown extraction domain {domain!r}")

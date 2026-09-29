@@ -8,6 +8,8 @@ Rules:
 - "quote" MUST be an exact, character-for-character substring of the protocol
   text (copy-paste, not a paraphrase) — it will be verified by exact match.
 - If a field is not present, set "value" to null and "quote" to "".
+- For "armNames", "value" is the arm names separated by "; " (for example
+  "Ibuzatrelvir; Placebo"), while "quote" is the exact sentence that states them.
 - Return every field in {fields} exactly once. No prose outside the JSON.
 
 YOUR REASONING:

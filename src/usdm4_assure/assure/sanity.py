@@ -78,6 +78,34 @@ def _identifier(value: str) -> Check:
     return _OK
 
 
+_DOSE_FRAGMENT = re.compile(r"^\d+(?:\.\d+)?\s*(?:mg|mcg|µg|ug|g|ml|kg|iu)\b", re.IGNORECASE)
+_NOT_AN_ARM = frozenset({"date", "irbs/ecs", "irbs/ ecs", "multi-country study", "sub-study",
+                         "any protocol administrative change letter(s)"})
+
+
+def arm_name_ok(name: str) -> bool:
+    """Whether ``name`` could be the name of a study arm.
+
+    Rejects what a regex over unscoped text produced in real runs: dose
+    fragments ("600 Mg"), stray punctuation or digits, and words lifted from
+    other sections ("Date", "IRBs/ECs").
+    """
+    n = name.strip()
+    if not 2 <= len(n) <= 60 or sum(c.isalpha() for c in n) < 3:
+        return False
+    if _DOSE_FRAGMENT.match(n) or n.lower() in _NOT_AN_ARM or n.lower().startswith("any protocol"):
+        return False
+    return True
+
+
+def _arm_names(value: str) -> Check:
+    names = [n for n in re.split(r"[;|]", value) if n.strip()]
+    bad = [n.strip() for n in names if not arm_name_ok(n)]
+    if not names or bad:
+        return Check("failed", f"not plausible arm name(s): {', '.join(bad) or 'none given'}")
+    return _OK
+
+
 def _long_text(value: str) -> Check:
     letters = sum(c.isalpha() for c in value)
     if len(value) < 15 or letters < 10 or len(value.split()) < 3:
@@ -104,6 +132,8 @@ def check(domain: str, field: str, value: str | None, doc_text: str = "") -> Che
         return _sponsor(value)
     if field == "protocolIdentifier":
         return _identifier(value)
+    if field == "armNames":
+        return _arm_names(value)
     if field in _LONG_TEXT_FIELDS:
         return _long_text(value)
     if _TOC_DOTS.search(value):

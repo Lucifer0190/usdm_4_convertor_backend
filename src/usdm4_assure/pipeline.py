@@ -24,7 +24,14 @@ from usdm4_assure.assure import assure
 from usdm4_assure.assure.completeness import account, demote_on_error
 from usdm4_assure.audit.store import AuditStore, record_source
 from usdm4_assure.audit.writer import write_run
-from usdm4_assure.contracts import AssuredField, Decision, Finding
+from usdm4_assure.contracts import (
+    AssuredField,
+    Decision,
+    Document,
+    Finding,
+    FindingKind,
+    Severity,
+)
 from usdm4_assure.extract import metadata as c1
 from usdm4_assure.extract.domains import extract_domain
 from usdm4_assure.extract.estimands import estimand_evidence, extract_estimands
@@ -34,6 +41,7 @@ from usdm4_assure.extract.windows import window_for
 from usdm4_assure.ingest.pdf import ingest
 from usdm4_assure.llm.router import get_llm, get_role_llm
 from usdm4_assure.sections.plan import build_plan
+from usdm4_assure.sections.slots import slot_document, strip_furniture
 from usdm4_assure.validate.gate import validate_wrapper
 from usdm4_assure.validate.repair import repair_loop
 
@@ -151,10 +159,25 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
            for d in ("metadata", "design", "eligibility", "objectives", "estimands", "sites")}
     findings = [f for w in win.values() for f in w.findings]
 
-    state = {"metadata": extract_domain("metadata", win["metadata"].document, members)}
+    # Section-level evidence (sections/slots.py): each domain reads its own section,
+    # not the whole protocol, with running headers/footers removed. A slot that is
+    # not found falls back to the routed window and says so.
+    inputs, soa_pages, slot_findings = _domain_inputs(pdf_path, win, routed)
+    findings += slot_findings
+    llm_primary, llm_alt = get_role_llm("extract"), get_role_llm("extract_alt")
+
+    def read(domain: str, meta_values: dict | None, escalate):
+        window_doc, scoped = inputs[domain]
+        return extract_domain(domain, window_doc, members, meta_values, escalate=escalate,
+                              scoped=scoped)
+
+    # First pass: the grounded two-pass LLM readers run here, on the narrow windows,
+    # instead of only as a repair-loop escalation (which never fired in a real run).
+    state = {"metadata": read("metadata", None, [llm_primary, llm_alt])}
     meta = state["metadata"].values()
-    for domain in ("design", "eligibility", "objectives"):
-        state[domain] = extract_domain(domain, win[domain].document, members, meta)
+    state["design"] = read("design", meta, [llm_primary, llm_alt])
+    state["eligibility"] = read("eligibility", meta, llm_primary)
+    state["objectives"] = read("objectives", meta, llm_primary)
     # C5 estimands (task 6.1): the hard_reasoning role plus a different-family
     # extract_alt member on top of the deterministic parser.
     estimands = extract_estimands(
@@ -171,8 +194,12 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     sites_values = {a.field: a.value for a in assured_sites if a.value}
     # The stitcher (task 2.3) is multi-page-aware; a table it can't confidently
     # reduce to the 3-header-row shape falls back to the single-page path.
-    pymupdf_grid = extract_pymupdf_stitched(pdf_path) or extract_pymupdf(pdf_path)
-    grid = cross_validate([extract_pdfplumber(pdf_path), pymupdf_grid])
+    # ``soa_pages`` is the schedule-of-activities section's page range (None when the
+    # outline has no such section): without it "the table with most activities" was
+    # an abbreviation glossary.
+    pymupdf_grid = (extract_pymupdf_stitched(pdf_path, soa_pages)
+                    or extract_pymupdf(pdf_path, soa_pages))
+    grid = cross_validate([extract_pdfplumber(pdf_path, soa_pages), pymupdf_grid])
 
     amendment_diff, amendments_data = None, None
     if previous_version is not None:
@@ -200,10 +227,12 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         return _failed_rules(study)
 
     def reextract(domain: str, rnd: int):
-        # Round 1 widens the evidence to the unrouted document (routing may have
-        # filtered it); round 2 also adds the hard_reasoning member.
-        return extract_domain(domain, doc, members, state["metadata"].values(),
-                              escalate=get_role_llm("hard_reasoning") if rnd > 1 else None)
+        # Same section-level inputs as the first pass; round 2 adds the
+        # hard_reasoning member.
+        window_doc, scoped = inputs[domain]
+        return extract_domain(domain, window_doc, members, state["metadata"].values(),
+                              escalate=get_role_llm("hard_reasoning") if rnd > 1 else None,
+                              scoped=scoped)
 
     # Bounded repair loop (task 6.3, DESIGN.md L8): validate -> re-extract -> re-validate.
     study = build(state)
@@ -294,6 +323,74 @@ class PipelineResult:
         for a in self.assured:
             c[a.decision.value] += 1
         return c
+
+
+def _merged(*docs: Document | None) -> Document | None:
+    """One Document from several windows' blocks, in document order."""
+    docs = [d for d in docs if d is not None]
+    if not docs:
+        return None
+    blocks = sorted((b for d in docs for b in d.blocks), key=lambda b: (b.page, b.bbox[1]))
+    return Document(source=docs[0].source, blocks=blocks,
+                    full_text="\n".join(b.text for b in blocks),
+                    page_images=docs[0].page_images, chars=docs[0].chars)
+
+
+def _domain_inputs(pdf_path: Path, win: dict, routed) -> tuple[dict, list | None, list]:
+    """Per-domain evidence: ``{domain: (document, scoped_extras)}``.
+
+    Reads each domain from its own section (title-matched slots), furniture
+    stripped. ``scoped_extras`` carries the eligibility inclusion/exclusion windows
+    and the objectives-table rows. Also returns the schedule-of-activities page
+    range, and findings for every slot that was not found.
+    """
+    findings: list[Finding] = []
+    clean = {d: strip_furniture(w.document) for d, w in win.items()}
+    graph = routed.graph if routed else None
+    have_graph = graph is not None and bool(graph.sections)
+
+    def slot(domain: str, *names: str, front: int = 0):
+        if not have_graph:
+            return None
+        w = slot_document(clean[domain], graph, *names, front_pages=front)
+        if w is None:
+            findings.append(Finding(
+                FindingKind.SCOPE, Severity.WARNING, domain,
+                f"Section slot {'/'.join(names)} not found in the outline; "
+                "reading the routed window instead."))
+        return w
+
+    meta_w = slot("metadata", "synopsis", front=2)
+    design_w = slot("design", "design", "synopsis", "interventions")
+    inc_w, exc_w = slot("eligibility", "inclusion"), slot("eligibility", "exclusion")
+    obj_w = slot("objectives", "objectives")
+    rows = None
+    if obj_w is not None:
+        from usdm4_assure.extract.objectives_table import read_objectives_table
+        rows = read_objectives_table(pdf_path, obj_w.pages) or None
+        if rows is None:
+            findings.append(Finding(
+                FindingKind.SCOPE, Severity.WARNING, "objectives",
+                "No objectives/endpoints/estimands table was found on the objectives "
+                "pages; falling back to text labels."))
+    elig_doc = _merged(inc_w.document if inc_w else None, exc_w.document if exc_w else None)
+
+    inputs = {
+        "metadata": (meta_w.document if meta_w else clean["metadata"], None),
+        "design": (design_w.document if design_w else clean["design"], None),
+        "eligibility": (elig_doc or clean["eligibility"],
+                        {"inclusion_doc": inc_w.document if inc_w else None,
+                         "exclusion_doc": exc_w.document if exc_w else None}
+                        if (inc_w or exc_w) else None),
+        "objectives": (obj_w.document if obj_w else clean["objectives"], {"rows": rows}),
+    }
+    soa_w = slot_document(clean["design"], graph, "soa") if have_graph else None
+    if have_graph and soa_w is None:
+        findings.append(Finding(
+            FindingKind.SCOPE, Severity.WARNING, "soa",
+            "No schedule-of-activities section found in the outline; the table finder "
+            "will search the whole document."))
+    return inputs, (soa_w.pages if soa_w else None), findings
 
 
 def _members(use_slm: bool) -> list:
