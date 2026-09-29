@@ -12,3 +12,6 @@ data/*
 .ruff_cache/
 spikes/_work/
 *.output
+
+CLAUDE.local.md
+docs/ai/STATE.md
