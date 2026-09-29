@@ -73,3 +73,30 @@ Baseline for generalisation (PLAN.md task Q-2). No crashes. Full table and the f
 The two weak spots are both SoA: duplicate visit names and visit columns with no mark. They are the
 large oncology schedules with cycle-based headers (C4891xxx, C2321xxx, C1071xxx), so they are the first
 target of PLAN.md task C-1.
+
+## LLM readers vs deterministic, train studies (2026-09-29, PLAN.md task Q-3)
+
+Five train studies, 976 reference items, scored with `eval/rubric.py` against the team's reference USDMs
+(not yet audited gold). Full report: `spikes/reports/benchmark_train_llm.md`. Held-out studies were not run.
+
+| | Accuracy | Recall |
+|---|---:|---:|
+| Deterministic only | 40.3% | 53.9% |
+| LLM readers on | **40.7%** | **58.0%** |
+
+| Category | Deterministic recall | LLM recall |
+|---|---:|---:|
+| scalars (title, sponsor, phase...) | 50% | **94%** |
+| arms | 44% | **89%** |
+| interventions | 33% | **58%** |
+| endpoints | 37% | **53%** |
+| estimands | 30% | **50%** |
+| criteria, objectives | 81% | 81–83% |
+| activities, marks, visits, epochs | 38–67% | same (the LLM does not read the SoA) |
+| identifiers, vendors | 17%, 0% | same (no reader yet) |
+
+The LLM lifts the fields it reads, but the overall score barely moves for two reasons:
+1. **The SoA is 60% of the score and no LLM reads it yet.** That is task C-2.
+2. **It adds wrong or extra items** (416 spurious items across the five studies), and those count against accuracy.
+
+Per study: C5091017 75.2%, C4601003 38.9%, C4891001 29.0%, C4891002 21.3%, C4891006 36.3%.
