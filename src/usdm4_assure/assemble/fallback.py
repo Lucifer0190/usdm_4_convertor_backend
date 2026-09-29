@@ -152,9 +152,18 @@ def _objectives_fallback(asm, block: dict) -> tuple[int, list[str]]:
     return len(built), failures
 
 
-def assemble(data: dict, *, name: str = "USDM4-Assure", version: str = "0.1.0"
-             ) -> AssemblyOutcome:
-    """Run the usdm4 assembler with per-section fallback."""
+def assemble(data: dict, *, name: str = "USDM4-Assure", version: str = "0.1.0",
+             sites: dict[str, str | None] | None = None) -> AssemblyOutcome:
+    """Run the usdm4 assembler with per-section fallback.
+
+    Args:
+        data: The (sanitized) ``AssemblerInput``-shaped dict.
+        name / version: Passed through to ``Assembler.wrapper()``.
+        sites: Extracted organization names (task 6.4,
+            ``extract.sites.FIELDS``), attached directly via
+            :func:`usdm4_assure.assemble.sites.attach_organizations` since
+            the assembler's own input schema cannot represent them.
+    """
     import usdm4
     from simple_error_log.errors import Errors
     from usdm4.assembler.assembler import Assembler
@@ -219,6 +228,9 @@ def assemble(data: dict, *, name: str = "USDM4-Assure", version: str = "0.1.0"
             for note in repair_timeline(asm._builder, design.scheduleTimelines,
                                         design.encounters, design.epochs):
                 outcome.findings.append(_finding(Severity.INFO, "soa", note))
+    if sites:
+        from usdm4_assure.assemble.sites import attach_organizations
+        outcome.findings += attach_organizations(asm, sites)
     outcome.assembler_sections = [s for s in supplied if s not in outcome.dropped]
     outcome.study_ok = True
     outcome.wrapper = asm.wrapper(name=name, version=version).model_dump(by_alias=True)

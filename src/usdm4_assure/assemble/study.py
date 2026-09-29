@@ -111,7 +111,8 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
                      objs: ObjectivesExtract | None = None,
                      run_core: bool = False,
                      estimands: EstimandsExtract | None = None,
-                     amendments: dict | None = None) -> dict:
+                     amendments: dict | None = None,
+                     sites: dict[str, str | None] | None = None) -> dict:
     """Assemble one complete USDM 4.0 study from every domain's assured output.
 
     Composes a data4knowledge ``AssemblerInput`` from the extracted domains, runs
@@ -130,6 +131,9 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
         amendments: An ``AmendmentsInput``-shaped dict (task 6.2,
             ``assemble.amendments.amendment_input``), or ``None`` for an
             original protocol.
+        sites: Extracted organization names (task 6.4,
+            ``extract.sites.FIELDS``), attached after assembly since the
+            assembler's own input schema cannot represent them.
 
     Returns:
         A dict with keys ``ok`` (bool), ``wrapper`` (the USDM dict or ``None``),
@@ -148,7 +152,7 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
     data, repairs = sanitize(raw)
     findings = findings + repairs
 
-    outcome = assemble(data)
+    outcome = assemble(data, sites=sites)
     findings += outcome.findings
     if not outcome.study_ok:
         return {"ok": False, "assembler_errors": outcome.errors, "wrapper": None,

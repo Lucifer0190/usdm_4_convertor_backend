@@ -28,6 +28,8 @@ from usdm4_assure.contracts import AssuredField, Decision, Finding
 from usdm4_assure.extract import metadata as c1
 from usdm4_assure.extract.domains import extract_domain
 from usdm4_assure.extract.estimands import estimand_evidence, extract_estimands
+from usdm4_assure.extract.sites import FIELDS as SITES_FIELDS
+from usdm4_assure.extract.sites import extract_sites
 from usdm4_assure.extract.windows import window_for
 from usdm4_assure.ingest.pdf import ingest
 from usdm4_assure.llm.router import get_llm, get_role_llm
@@ -78,6 +80,8 @@ class FullResult:
         amendment_diff: The section-level ``AmendmentDiff`` against
             ``previous_version`` (task 6.2), or ``None``.
         repair: The bounded repair loop's ``RepairOutcome`` (task 6.3).
+        assured_sites: C6's organization/role fields (task 6.4) after the
+            Assurance layer.
     """
     assured_meta: list[AssuredField]
     design: object
@@ -97,6 +101,7 @@ class FullResult:
     estimands: object = None
     amendment_diff: object = None
     repair: object = None
+    assured_sites: list[AssuredField] = field(default_factory=list)
 
 
 def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
@@ -143,7 +148,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     members = _members(use_slm)
     routed = build_plan(doc, pdf_path) if routing else None
     win = {d: window_for(doc, routed, d)
-           for d in ("metadata", "design", "eligibility", "objectives", "estimands")}
+           for d in ("metadata", "design", "eligibility", "objectives", "estimands", "sites")}
     findings = [f for w in win.values() for f in w.findings]
 
     state = {"metadata": extract_domain("metadata", win["metadata"].document, members)}
@@ -157,6 +162,13 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         [get_role_llm("hard_reasoning"), get_role_llm("extract_alt")])
     assured_estimands = estimands.assured_fields()
     findings += estimands.findings
+    # C6 organizations/sites (task 6.4): deterministic + one grounded LLM member.
+    # Its own domain (in review.json/audit) but attached post-assembly, not
+    # assembled from a shard — see assemble.sites.attach_organizations.
+    sites_doc = win["sites"].document
+    sites_cands = extract_sites(sites_doc, get_role_llm("route"))
+    assured_sites = assure(sites_cands, sites_doc, SITES_FIELDS, domain="sites")
+    sites_values = {a.field: a.value for a in assured_sites if a.value}
     # The stitcher (task 2.3) is multi-page-aware; a table it can't confidently
     # reduce to the 3-header-row shape falls back to the single-page path.
     pymupdf_grid = extract_pymupdf_stitched(pdf_path) or extract_pymupdf(pdf_path)
@@ -180,7 +192,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         return build_full_study(st["metadata"].fields, st["design"].extract, grid,
                                 st["eligibility"].extract, st["objectives"].extract,
                                 run_core=run_core, estimands=estimands,
-                                amendments=amendments_data)
+                                amendments=amendments_data, sites=sites_values)
 
     def revalidate(st: dict) -> list[str]:
         nonlocal study
@@ -206,7 +218,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         state[d].fields for d in ("metadata", "design", "eligibility", "objectives"))
     design, elig, objs = (state[d].extract for d in ("design", "eligibility", "objectives"))
     all_assured = (assured_meta + assured_design + assured_eligibility + assured_objectives
-                   + assured_estimands)
+                   + assured_estimands + assured_sites)
     # Completeness (task 3.6): expected-vs-found across domains, over current-scope text.
     gaps = account(design=design, grid=grid, eligibility=elig, objectives=objs,
                    wrapper=study.get("wrapper"), evidence_text=win["design"].document.full_text)
@@ -224,7 +236,8 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     for domain, fields_ in (("metadata", assured_meta), ("design", assured_design),
                             ("eligibility", assured_eligibility),
                             ("objectives", assured_objectives),
-                            ("estimands", assured_estimands)):
+                            ("estimands", assured_estimands),
+                            ("sites", assured_sites)):
         write_run(audit_store, run_id=run_id, source_sha256=source_sha256, domain=domain,
                  assured_fields=fields_, retrieval_config=win[domain].retrieval_config())
     audit_store.close()
@@ -254,7 +267,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
                       assured_design, assured_eligibility, assured_objectives,
                       routed=routed, findings=findings, windows=win,
                       source_sha256=source_sha256, run_id=run_id, estimands=estimands,
-                      amendment_diff=amendment_diff, repair=repair)
+                      amendment_diff=amendment_diff, repair=repair, assured_sites=assured_sites)
 
 
 @dataclass

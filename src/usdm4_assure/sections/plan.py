@@ -28,6 +28,7 @@ DOMAIN_ROUTES: dict[str, str] = {
     "eligibility": "populations_eligibility",
     "objectives": "objectives_endpoints",
     "estimands": "estimands",
+    "sites": "organizations_sites",
     "soa": "schedule_activities",
 }
 
