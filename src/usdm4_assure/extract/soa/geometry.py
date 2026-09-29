@@ -47,7 +47,13 @@ _EPOCH_NAMES = (
 )
 _UNIT_HINT = re.compile(r"(?<![a-z])(day|week|month|cycle)s?(?![a-z])\s*(\([^)]*\))?", re.IGNORECASE)
 _ROW_UNIT = re.compile(r"^(study\s+)?(week|day|month)s?\b", re.IGNORECASE)
-_CYCLE = re.compile(r"^(cycle|c)\s*\d+\b", re.IGNORECASE)
+_CYCLE = re.compile(r"^(cycles?\s*(\d|[≥>≤<]|and\b)|c\d)", re.IGNORECASE)
+# Footnote letters / asterisks after a header label: "EOT / Withdrawal a", "Day 1 b, c", "±2d*".
+_FOOTNOTE_TAIL = re.compile(r"(?:\s+[a-z](?:\s*,\s*[a-z])*|\s*\*+)+$")
+# Header-row roles named in the first column. "Visit Identifier" is deliberately not an id
+# row: in some templates it holds the epoch band ("Screen." / "Treatment Period").
+_ROLE_ID = re.compile(r"^visit(?:\s*(?:number|no\.?|#|id)\b|$)", re.IGNORECASE)
+_ROLE_WINDOW = re.compile(r"\bwindow\b", re.IGNORECASE)
 _NARROW = 45.0                # points: a cell this narrow wraps words mid-word
 _EXTENDS_PREVIOUS = re.compile(r"^(et|early term\w*|unscheduled|eot|end of treatment)\b", re.IGNORECASE)
 
@@ -348,6 +354,25 @@ def _split_label(parts: list[str]) -> tuple[str, str]:
     return " ".join(name).strip(), " ".join(window).strip()
 
 
+def _strip_footnote(text: str) -> str:
+    return _FOOTNOTE_TAIL.sub("", text.strip()).strip()
+
+
+def _name_from_roles(parts: list[tuple[str, str]]) -> tuple[str, str, str]:
+    """``(name, window, description)`` of a column whose header has a visit-number row.
+
+    "Visit Number: 1a" names the visit "Visit 1a"; rows labelled as windows are windows even
+    when they read like dates ("Jul 2022 to Mar 2023"); other rows ("Visit Identifier:
+    Dose 1") describe the visit. With no number in this column the description names it.
+    """
+    ident = _strip_footnote(next((t for ro, t in parts if ro == "id"), ""))
+    window = " ".join(t for ro, t in parts if ro == "window")
+    desc = _strip_footnote(" ".join(t for ro, t in parts if ro == ""))
+    if re.fullmatch(r"\d+[a-z]?", ident):
+        return f"Visit {ident}", window, desc
+    return desc or ident, window, ""          # "Unplanned" + "Suspected-LD Acute Visit"
+
+
 def _detect_notes_column(t: _Table, first_visit_col: int, header_rows: int) -> int:
     """Index (into columns) of the notes column, or ``len(columns)`` if there is none."""
     n_cols = len(t.col_edges) - 1
@@ -381,6 +406,13 @@ def _body_start(t: _Table, notes_col: int) -> int:
     return n_rows
 
 
+def _header_key(t: _Table) -> str:
+    """The first row's text, letters and digits only: equal on every page of one table."""
+    y0, y1 = t.row_edges[0], t.row_edges[1]
+    key = re.sub(r"\W+", "", _join(_cell_lines(t.lines, t.col_edges[0], t.col_edges[-1], y0, y1)))
+    return key.lower() if len(key) >= 12 else ""
+
+
 def _same_columns(a: list[float], b: list[float]) -> bool:
     return len(a) == len(b) and all(abs(x - y) <= 3.0 for x, y in zip(a, b, strict=True))
 
@@ -394,7 +426,10 @@ class _Parsed:
 
 
 def _parse_table_pages(tables: list[_Table]) -> _Parsed:
-    first = tables[0]
+    # A continuation page can miss a column rule the other pages have; the page with the
+    # finest grid carries the header, and every page maps its cells onto those columns by
+    # position (all pages of one table share the page's x coordinates).
+    first = max(tables, key=lambda t: len(t.col_edges))
     # The header is the rows above the first group/mark row; decide the notes column
     # from a provisional two-row header, then re-derive the body start.
     notes_col = _detect_notes_column(first, 1, 2)
@@ -409,11 +444,14 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
     label_parts: dict[int, list[str]] = {c: [] for c in visit_cols}
     prefix_parts: dict[int, list[str]] = {c: [] for c in visit_cols}
     window_parts: dict[int, list[str]] = {c: [] for c in visit_cols}
+    role_parts: dict[int, list[tuple[str, str]]] = {c: [] for c in visit_cols}
     for r in range(first.body_start):
         y0, y1 = first.row_edges[r], first.row_edges[r + 1]
         edges = _edges_in_band(first, y0, y1)
-        row_label = _join(_cell_lines(first.lines, first.col_edges[0], first.col_edges[1], y0, y1))
+        row_label = _strip_footnote(
+            _join(_cell_lines(first.lines, first.col_edges[0], first.col_edges[1], y0, y1)))
         row_unit = _ROW_UNIT.match(row_label)
+        role = "id" if _ROLE_ID.match(row_label) else "window" if _ROLE_WINDOW.search(row_label) else ""
         for i in range(len(edges) - 1):
             ex0, ex1 = edges[i], edges[i + 1]
             covered = [c for c in visit_cols
@@ -435,7 +473,9 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
                 elif _CYCLE.match(text):                   # "Cycle 1" over its Day 1 / Day 8 columns
                     for c in covered:
                         prefix_parts[c].append(text)
-            if r == 0:
+            if len(covered) == 1:
+                role_parts[covered[0]].append((role, text))
+            if r == 0 and role != "id":
                 for c in covered:
                     epoch_by_col.setdefault(c, _norm_epoch(text))
                 if len(covered) == 1:
@@ -449,22 +489,28 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
                 label_parts[covered[0]] += [p for p in (rotated, horizontal) if p]
     visits, timings, epochs = [], [], []
     last_epoch = ""
+    has_id_row = any(ro == "id" for parts in role_parts.values() for ro, _ in parts)
     for c in visit_cols:
         parts = label_parts[c]
         primary = [p for p in parts if not p.startswith("\x00")]
         fallback = [p[1:] for p in parts if p.startswith("\x00")]
-        name, window = _split_label(primary or fallback)
-        if not name:
-            name, _ = _split_label(fallback)
+        if has_id_row:
+            name, window, desc = _name_from_roles(role_parts[c])
+            window = " ".join(p for p in (desc, window) if p)
+        else:
+            name, window = _split_label(primary or fallback)
+            if not name:
+                name, _ = _split_label(fallback)
         window = window or " ".join(window_parts[c])
-        prefix = " ".join(p for p in prefix_parts[c] if p not in (name or ""))
+        name = _strip_footnote(name or "")
+        prefix = " ".join(_strip_footnote(p) for p in prefix_parts[c] if p not in name)
         if prefix and name:
             name = f"{prefix} {name}"
         if re.fullmatch(r"\d+(?:\.\d+)?", name or "") and c in unit_by_col:
             unit_name, unit_window = unit_by_col[c]        # "8" under "Week (+/- 7 days)" -> "Week 8"
             name = f"{unit_name} {name}"
             window = window or unit_window
-        epoch = epoch_by_col.get(c, "")
+        epoch =_strip_footnote(epoch_by_col.get(c, ""))
         if not epoch or (_EXTENDS_PREVIOUS.match(epoch) and last_epoch):
             epoch = last_epoch or epoch
         last_epoch = epoch or last_epoch
@@ -477,6 +523,8 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
         re.sub(r"\W+", "", _join(_cell_lines(first.lines, first.col_edges[0], first.col_edges[1],
                                              first.row_edges[r], first.row_edges[r + 1])).lower())
         for r in range(first.body_start)}
+    centres = [(first.col_edges[c] + first.col_edges[c + 1]) / 2 for c in visit_cols]
+    body_x0, body_x1 = first.col_edges[1], first.col_edges[notes_col]
     rows: list[tuple[str, dict[int, str]]] = []
     for t in tables:
         start = first.body_start if t is first else 0
@@ -487,16 +535,14 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
             if t is not first and signature in header_signatures:
                 continue                                    # repeated header row
             if t is not first and not label and not any(
-                    _MARK.match(ln.text) for ln in _cell_lines(
-                        t.lines, t.col_edges[1], t.col_edges[notes_col], y0, y1)):
+                    _MARK.match(ln.text) for ln in _cell_lines(t.lines, body_x0, body_x1, y0, y1)):
                 continue                                    # empty header remnant
             marks: dict[int, str] = {}
             if not _row_is_group(t, r):
                 edges = _edges_in_band(t, y0, y1)
                 for i in range(len(edges) - 1):
                     ex0, ex1 = edges[i], edges[i + 1]
-                    covered = [vi for vi, c in enumerate(visit_cols)
-                               if t.col_edges[c] >= ex0 - _TOL and t.col_edges[c + 1] <= ex1 + _TOL]
+                    covered = [vi for vi, x in enumerate(centres) if ex0 - _TOL <= x <= ex1 + _TOL]
                     if not covered:
                         continue
                     cell = [ln for ln in _cell_lines(t.lines, ex0, ex1, y0, y1) if not ln.rotated]
@@ -544,7 +590,8 @@ def read_soa_geometry(pdf_path: str | Path, pages: list[int] | None = None) -> S
     # Consecutive pages with the same columns are one table; a new column layout starts another.
     groups: list[list[_Table]] = []
     for t in tables:
-        if groups and _same_columns(groups[-1][0].col_edges, t.col_edges):
+        if groups and (_same_columns(groups[-1][0].col_edges, t.col_edges)
+                       or _header_key(groups[-1][0]) == _header_key(t) != ""):
             groups[-1].append(t)
         else:
             groups.append([t])
