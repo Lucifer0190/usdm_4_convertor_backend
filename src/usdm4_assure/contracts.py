@@ -252,6 +252,7 @@ class AssuredField:
     decision: Decision
     quote: Quote | None = None
     domain: str = ""
+    sanity: str = ""            # validator verdict: "confirmed" | "neutral" | why it failed
 
     def as_review_row(self) -> dict:
         return {
@@ -263,6 +264,7 @@ class AssuredField:
             "methods_agree": self.methods_agree,
             "n_methods": self.n_methods,
             "verifier": self.verifier,
+            "sanity": self.sanity,
             "quote": self.quote.as_row() if self.quote else None,
             "page": self.quote.page if self.quote else None,
             "bbox": list(self.quote.bbox) if self.quote and self.quote.bbox else None,

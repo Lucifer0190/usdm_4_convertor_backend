@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
+from usdm4_assure.assure.sanity import Check, check as sanity_check
 from usdm4_assure.assure.verify import verify_deterministic, verify_llm
 from usdm4_assure.contracts import (
     AssuredField,
@@ -48,27 +49,61 @@ def _method_name(c: _Candidate) -> str:
 
 
 # --- 4.1 ensemble ------------------------------------------------------------ #
-def _pick_value(cands: list[_Candidate]) -> tuple[str | None, bool, list[_Candidate]]:
-    """Choose the consensus value; report agreement and the winning group.
+# Method names that are an LLM member on the legacy (ungrounded) path.
+_LLM_METHODS = frozenset({"claude", "slm", "llm", "openrouter"})
+
+
+def _group(c: _Candidate) -> str:
+    """The independence group a candidate votes in.
+
+    Members that share a code path or a source are one vote: every regex/label/
+    table parser is ``"deterministic"`` (two of them agreeing on a wrong value
+    read the same footer), while each LLM is its own group, keyed by model.
+    """
+    if isinstance(c, GroundedCandidate):
+        if c.method.value.startswith("llm") or c.method.value == "vision":
+            return f"llm:{c.model_id or c.method.value}"
+        return "deterministic"
+    name = c.method
+    return f"llm:{name}" if name in _LLM_METHODS or name.startswith("llm") else "deterministic"
+
+
+def _is_llm(group: str) -> bool:
+    return group.startswith("llm:")
+
+
+def _choose(cands: list[_Candidate], domain: str, field: str, doc_text: str
+            ) -> tuple[str | None, bool, list[_Candidate], Check, int]:
+    """Choose the value to deliver for one field.
+
+    Buckets candidates by normalised value, drops any bucket whose value fails a
+    sanity check when a valid one exists, then ranks by *independent* groups
+    (not headcount), preferring an LLM-backed bucket on a tie.
 
     Returns:
-        ``(value, methods_agree, winner_group)`` where ``winner_group`` is
-        every candidate that voted for the winning (normalized) value — the
-        grounding and verifier steps only look at this group, not the whole
-        field's candidate pool.
+        ``(value, agree, winner_group, check, n_groups)``. ``value`` is ``None``
+        when every candidate value fails its sanity check: an implausible value
+        is never delivered.
     """
     buckets: dict[str, list[_Candidate]] = defaultdict(list)
     for c in cands:
         if c.value:
             buckets[_norm(c.value)].append(c)
     if not buckets:
-        return None, False, []
-    winner_key = max(buckets, key=lambda k: len(buckets[k]))
-    winner_group = buckets[winner_key]
-    winner = winner_group[0].value
-    distinct_methods = {_method_name(c) for c in winner_group}
-    agree = len(distinct_methods) >= 2 or (len(buckets) == 1 and len(cands) >= 2)
-    return winner, agree, winner_group
+        return None, False, [], Check("neutral"), 0
+
+    ranked = []
+    for key, bucket in buckets.items():
+        chk = sanity_check(domain, field, bucket[0].value, doc_text)
+        groups = {_group(c) for c in bucket}
+        ranked.append(((chk.status != "failed", chk.status == "confirmed", len(groups),
+                        any(_is_llm(g) for g in groups), len(bucket)), key, chk, groups))
+    ranked.sort(key=lambda r: r[0], reverse=True)
+    _, key, chk, groups = ranked[0]
+    if chk.status == "failed":
+        return None, False, buckets[key], chk, len(groups)
+    group = buckets[key]
+    return group[0].value, len(groups) >= 2, group, chk, len(groups)
 
 
 # --- 4.2 grounding ------------------------------------------------------------ #
@@ -116,12 +151,19 @@ def _confidence(agree: bool, n_methods: int, verifier: str) -> float:
     return max(0.0, min(1.0, base))
 
 
-def _decide(value: str | None, agree: bool, verifier: str, conf: float) -> Decision:
+def _decide(value: str | None, agree: bool, verifier: str, conf: float,
+            chk: Check, has_llm_backing: bool) -> Decision:
+    """Triage. ``auto_accept`` needs independent agreement (or a validator's own
+    confirmation) *and* a supported source span; a value that only deterministic
+    members produced can never certify itself."""
     if value is None:
         return Decision.BLOCK
     if verifier == "unsupported":
         return Decision.REVIEW
-    if agree and verifier == "supported" and conf >= 0.8:
+    independent = agree or chk.status == "confirmed"
+    if not has_llm_backing and chk.status != "confirmed":
+        independent = False           # deterministic-only: needs a validator's confirmation
+    if independent and verifier == "supported" and conf >= 0.8:
         return Decision.AUTO_ACCEPT
     return Decision.REVIEW
 
@@ -155,8 +197,8 @@ def assure(candidates: list[_Candidate], document: Document, fields: list[str],
     results: list[AssuredField] = []
     for f in fields:
         cands = by_field.get(f, [])
-        value, agree, winner_group = _pick_value(cands)
-        n_methods = len({_method_name(c) for c in cands if c.value})
+        value, agree, winner_group, chk, n_groups = _choose(cands, domain, f, document.full_text)
+        n_methods = n_groups
         quote, hard_block = _resolve_grounding(winner_group)
         source_text = _source_text(winner_group, quote)
 
@@ -164,16 +206,19 @@ def assure(candidates: list[_Candidate], document: Document, fields: list[str],
         if v == "partial" and verify_member is not None and source_text:
             v = verify_llm(value, source_text, verify_member)
 
-        conf = _confidence(agree, n_methods, v)
+        conf = _confidence(agree or chk.status == "confirmed", n_methods, v)
         if hard_block:
             decision, conf = Decision.BLOCK, 0.0
         else:
-            decision = _decide(value, agree, v, conf)
+            decision = _decide(value, agree, v, conf, chk,
+                               any(_is_llm(_group(c)) for c in winner_group))
+        if chk.status == "failed":
+            conf = 0.0
 
         results.append(AssuredField(
             field=f, value=value, candidates=cands,
             methods_agree=agree, n_methods=n_methods,
             verifier=v, confidence=conf, decision=decision,
-            quote=quote, domain=domain,
+            quote=quote, domain=domain, sanity=chk.reason or chk.status,
         ))
     return results

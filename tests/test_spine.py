@@ -32,9 +32,12 @@ def test_all_metadata_values_correct(result):
             f"{field}: got {got[field]!r}, expected ~{expected!r}")
 
 
-def test_ensemble_agreement_auto_accepts_phase(result):
+def test_confirmed_phase_is_auto_accepted(result):
+    """Two regex members are one vote (they share a source), so agreement alone no
+    longer certifies a deterministic value; the document's own ``Phase:`` label
+    does, via the sanity validator."""
     phase = next(a for a in result.assured if a.field == "studyPhase")
-    assert phase.methods_agree, "two deterministic methods should agree on phase"
+    assert phase.sanity == "matches the synopsis Phase label"
     assert phase.decision.value == "auto_accept"
 
 

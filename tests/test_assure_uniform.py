@@ -35,12 +35,13 @@ def test_every_requested_field_gets_an_assured_row_even_with_no_candidates():
 
 def test_each_domain_tag_is_carried_onto_its_assured_fields():
     doc = _doc()
+    value = "To compare the efficacy of drug A versus placebo"   # long enough to pass sanity
     for domain, field in [("metadata", "studyTitle"), ("design", "studyType"),
                           ("eligibility", "plannedSex"), ("objectives", "primaryObjective")]:
-        cands = [FieldCandidate(field, "X", "det", "X")]
+        cands = [FieldCandidate(field, value, "det", value)]
         results = assure(cands, doc, [field], domain=domain)
         assert results[0].domain == domain
-        assert results[0].value == "X"
+        assert results[0].value == value
 
 
 # --- failed quote => BLOCK ----------------------------------------------------- #
@@ -68,15 +69,20 @@ def test_partial_grounding_one_ok_one_failed_is_not_blocked():
 
 def test_ungrounded_deterministic_only_candidate_is_not_forced_to_block():
     """A value with zero GroundedCandidate members has no grounding claim to
-    verify, so the legacy deterministic path applies unchanged."""
-    doc = _doc("Phase 2 study of drug ABC-123.")
+    verify, so the legacy deterministic path applies. Policy change (source
+    independence): two regex members agreeing is one vote, so on its own it is
+    only REVIEW; it reaches auto_accept when the document independently confirms
+    the value (here, the synopsis ``Phase:`` label)."""
     cands = [
         FieldCandidate("studyPhase", "Phase 2", "labels", "Phase 2", 1),
         FieldCandidate("studyPhase", "Phase 2", "titlepage", "Phase 2", 1),
     ]
-    results = assure(cands, doc, ["studyPhase"], domain="metadata")
-    assert results[0].decision is Decision.AUTO_ACCEPT
-    assert results[0].quote is None
+    alone = assure(cands, _doc("Phase 2 study of drug ABC-123."), ["studyPhase"],
+                   domain="metadata")[0]
+    assert alone.decision is Decision.REVIEW and alone.quote is None
+    confirmed = assure(cands, _doc("Phase:\n2\nPhase 2 study of drug ABC-123."),
+                       ["studyPhase"], domain="metadata")[0]
+    assert confirmed.decision is Decision.AUTO_ACCEPT and confirmed.quote is None
 
 
 def test_no_value_at_all_is_blocked():
