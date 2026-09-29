@@ -43,7 +43,8 @@ def _interventions_from_arms(design: DesignExtract) -> tuple[list[dict], dict]:
 def _objectives_block(objs: ObjectivesExtract) -> dict:
     items = []
     for p in objs.items:
-        endpoints = ([{"text": p.endpoint, "level": p.level}] if p.endpoint else [])
+        texts = p.endpoints or ([p.endpoint] if p.endpoint else [])
+        endpoints = [{"text": t, "level": p.level} for t in texts]
         items.append({"text": p.objective, "level": p.level, "endpoints": endpoints})
     return {"objectives": items, "estimands": []}
 

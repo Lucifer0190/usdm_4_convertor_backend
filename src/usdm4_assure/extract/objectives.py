@@ -17,8 +17,11 @@ from usdm4_assure.llm.two_pass import extract_shard
 @dataclass
 class ObjectivePair:
     objective: str
-    endpoint: str | None
-    level: str  # Primary | Secondary
+    endpoint: str | None          # scalar view: the first endpoint
+    level: str                    # Primary | Secondary | Exploratory
+    endpoints: list[str] = field(default_factory=list)   # every endpoint of the row
+    estimand: str | None = None   # the row's estimand text, when the table has one
+    tier: str = ""                # the tier label as printed ("Key Secondary ...")
 
 
 @dataclass
@@ -36,8 +39,23 @@ def _label_value(text: str, label: str) -> str | None:
     return None
 
 
-def extract_objectives(doc: Document) -> ObjectivesExtract:
+def extract_objectives(doc: Document, rows: list | None = None) -> ObjectivesExtract:
+    """Objectives and endpoints.
+
+    ``rows`` are :class:`~usdm4_assure.extract.objectives_table.ObjectiveRow`s read
+    from the objectives table; when present they are the source (one pair per
+    row, every endpoint kept, the estimand carried alongside). Without them the
+    label parser below reads the document text as before.
+    """
     o = ObjectivesExtract()
+    if rows:
+        for r in rows:
+            o.items.append(ObjectivePair(
+                r.objective, r.endpoints[0] if r.endpoints else None, r.level,
+                endpoints=list(r.endpoints), estimand=r.estimand, tier=r.tier))
+        o.confidence = 0.8 if any(i.level == "Primary" and i.endpoint for i in o.items) else 0.6
+        o.decision = "auto_accept" if o.confidence >= 0.8 else "review"
+        return o
     text = doc.full_text
 
     prim_obj = _label_value(text, r"primary objective")

@@ -86,3 +86,33 @@ def test_repeated_header_rows_are_not_objectives(tmp_path):
 def test_no_table_on_the_pages_returns_an_empty_list(tmp_path):
     empty = _pdf(tmp_path / "e.pdf", [["Just", "text", "here"]], [["more", "more", "more"]])
     assert read_objectives_table(empty, pages=[1, 2]) == []
+
+
+# --- ObjectivesExtract built from rows -------------------------------------------- #
+def test_extract_objectives_from_rows_keeps_every_endpoint_and_the_estimand(tmp_path):
+    from pathlib import Path
+
+    from usdm4_assure.contracts import Document
+    from usdm4_assure.extract.objectives import extract_objectives
+
+    rows = read_objectives_table(_pdf(tmp_path / "o.pdf", PAGE1, PAGE2), pages=[1, 2])
+    extract = extract_objectives(Document(Path("x.pdf"), [], ""), rows=rows)
+    assert [i.level for i in extract.items] == ["Primary", "Secondary", "Secondary", "Exploratory"]
+    safety = extract.items[2]
+    assert safety.endpoints == ["Incidence of TEAEs.", "Incidence of SAEs."]
+    assert safety.endpoint == "Incidence of TEAEs."          # scalar view = first endpoint
+    assert extract.items[1].estimand.startswith("Difference in median time.")
+    assert extract.decision == "auto_accept"
+
+
+def test_assembler_block_lists_every_endpoint_of_a_row():
+    from usdm4_assure.assemble.study import _objectives_block
+    from usdm4_assure.extract.objectives import ObjectivePair, ObjectivesExtract
+
+    block = _objectives_block(ObjectivesExtract(items=[
+        ObjectivePair("Describe safety.", "TEAEs.", "Secondary",
+                      endpoints=["TEAEs.", "SAEs."])]))
+    assert [e["text"] for e in block["objectives"][0]["endpoints"]] == ["TEAEs.", "SAEs."]
+    legacy = _objectives_block(ObjectivesExtract(items=[
+        ObjectivePair("Assess efficacy.", "PASI 75.", "Primary")]))
+    assert [e["text"] for e in legacy["objectives"][0]["endpoints"]] == ["PASI 75."]
