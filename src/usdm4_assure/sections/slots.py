@@ -49,12 +49,16 @@ class Slot:
     """
     name: str
     patterns: tuple[str, ...]
+    # Keep only matches within this many pages of the first match. A protocol's amendment
+    # history repeats the *historic* schedules (Tables 16-18 on pages 184-211 of a 200-page
+    # protocol) and those must not be read as the current one.
+    cluster_pages: int | None = None
 
 
 SLOTS: dict[str, Slot] = {s.name: s for s in (
     Slot("synopsis", (r"^(protocol )?synopsis$", r"^protocol summary$")),
     Slot("soa", (r"schedule of (activities|assessments|events)", r"^flow ?chart$",
-                 r"time and events", r"study flow ?chart")),
+                 r"time and events", r"study flow ?chart"), cluster_pages=15),
     Slot("objectives", (r"^objectives?,? (endpoints?,? )?(and )?(estimands?|endpoints?)",
                         r"^objectives?,? estimands?,? (and )?endpoints?",
                         r"^study objectives?$", r"^objectives?$")),
@@ -100,6 +104,9 @@ def find_sections(graph: SectionGraph, slot: str) -> list[Section]:
         for s in matched:
             if any(_pos(c) <= _pos(s) < _end_of(graph, c) for c in chosen):
                 continue          # nested inside a section already chosen
+            if spec.cluster_pages is not None and chosen and \
+                    s.page - chosen[0].page > spec.cluster_pages:
+                continue          # a historic copy far from the main one
             chosen.append(s)
         return chosen
     return []

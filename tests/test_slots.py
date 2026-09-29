@@ -131,3 +131,15 @@ def test_long_furniture_is_removed_even_where_its_height_differs():
         blocks.append((p, 300.0, f"body {WORDS[p - 1]} text"))
     out = strip_furniture(_doc(*blocks))
     assert not any("PFIZER CONFIDENTIAL" in b.text for b in out.blocks)
+
+
+def test_the_soa_slot_ignores_historic_schedules_far_from_the_main_one():
+    graph = _graph(("1.3. Schedule of Activities", 2, 3, 100.0),
+                   ("Table 1. Schedule of Activities", 3, 3, 110.0),
+                   ("5. Study Population", 1, 8, 10.0),
+                   ("Appendix 14: Protocol Amendment History", 1, 150, 10.0),
+                   ("Table 16. Schedule of Activities: Study Lead-in", 2, 184, 10.0),
+                   ("Table 18. Schedule of Activities: Phase 3", 2, 195, 10.0))
+    doc = _doc((3, 120.0, "main soa"), (184, 20.0, "old soa"), (195, 20.0, "older soa"))
+    win = slot_document(doc, graph, "soa")
+    assert [b.text for b in win.document.blocks] == ["main soa"]

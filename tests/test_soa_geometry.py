@@ -143,3 +143,14 @@ def test_no_ruled_table_returns_none(tmp_path):
     path = tmp_path / "plain.pdf"
     doc.save(str(path))
     assert read_soa_geometry(path, pages=[1]) is None
+
+
+@pytest.mark.parametrize("text,is_mark", [
+    ("X", True), ("x", True), ("X (a)", True), ("X\u1d48", True), ("\u2713", True), ("\u25cf", True),
+    ("X (to be performed every cycle)", True), ("X, see Note 2", True),
+    ("as per standard of care", False), ("See Section 8.3", False), ("", False), ("0 days", False),
+    ("Xenon", False), ("(\u00b1 1 day)", False),
+])
+def test_what_counts_as_a_mark(text, is_mark):
+    from usdm4_assure.extract.soa.geometry import _MARK
+    assert bool(_MARK.match(text)) is is_mark

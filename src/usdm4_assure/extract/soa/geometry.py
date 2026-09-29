@@ -38,7 +38,7 @@ from usdm4_assure.extract.soa.grid import SoAGrid
 
 _TOL = 1.6                    # points: rules closer than this are the same rule
 _MIN_COVERAGE = 0.30          # of the table's height/width, for a rule to define a column/row
-_MARK = re.compile(r"^\s*(?:[xX✓✔•●■√×])(?:\s*[\(\[]?[a-z0-9,\s]{0,6}[\)\]]?)?\s*$")
+_MARK = re.compile(r"^\s*[xX\u2713\u2714\u2022\u25cf\u25a0\u221a\u00d7](?:$|[\s(\[,;.\u00b9\u00b2\u00b3\u2070-\u209f\u1d2c-\u1d6a])")
 _WINDOW = re.compile(r"^\(?\s*(?:[±+\-−]|\+/-)\s*\d|^\d+\s*days?\)?$|^window", re.IGNORECASE)
 _EPOCH_NAMES = (
     (re.compile(r"^screen", re.I), "Screening Period"),
