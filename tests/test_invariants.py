@@ -17,12 +17,14 @@ from usdm4_assure.extract.soa.grid import SoAGrid
 
 
 def _grid(**over):
-    base = dict(method="geometry",
-                epochs=["Screening Period", "Treatment Period", "Treatment Period"],
-                visits=["Day -1 to Day 1", "Day 1", "Day 8"],
-                timings=["Day -1 to Day 1", "Day 1", "Day 8"],
-                activities=["GROUP", "Consent", "Vitals", "PK", "ECG", "Labs"],
-                cells={(1, 0), (2, 0), (2, 1), (2, 2), (3, 1), (4, 1), (5, 2)})
+    base = {
+        "method": "geometry",
+        "epochs": ["Screening Period", "Treatment Period", "Treatment Period"],
+        "visits": ["Day -1 to Day 1", "Day 1", "Day 8"],
+        "timings": ["Day -1 to Day 1", "Day 1", "Day 8"],
+        "activities": ["GROUP", "Consent", "Vitals", "PK", "ECG", "Labs"],
+        "cells": {(1, 0), (2, 0), (2, 1), (2, 2), (3, 1), (4, 1), (5, 2)},
+    }
     base.update(over)
     return SoAGrid(**base)
 

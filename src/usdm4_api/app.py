@@ -79,7 +79,8 @@ def create_app(converter: Converter | None = None) -> FastAPI:
         return {"api": app.version, "converter": conv.name}
 
     @app.post("/v1/convert", dependencies=[Depends(require_key)])
-    async def convert(file: UploadFile = File(...), include_report: bool = False):
+    async def convert(file: UploadFile = File(...),  # noqa: B008
+                      include_report: bool = False):
         if not allow_no_llm and not llm_ready():
             raise HTTPException(
                 status_code=503,

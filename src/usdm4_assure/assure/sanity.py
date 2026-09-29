@@ -93,9 +93,8 @@ def arm_name_ok(name: str) -> bool:
     n = name.strip()
     if not 2 <= len(n) <= 60 or sum(c.isalpha() for c in n) < 3:
         return False
-    if _DOSE_FRAGMENT.match(n) or n.lower() in _NOT_AN_ARM or n.lower().startswith("any protocol"):
-        return False
-    return True
+    return not (_DOSE_FRAGMENT.match(n) or n.lower() in _NOT_AN_ARM
+                or n.lower().startswith("any protocol"))
 
 
 def _arm_names(value: str) -> Check:

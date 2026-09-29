@@ -25,7 +25,8 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
-from usdm4_assure.assure.sanity import Check, check as sanity_check
+from usdm4_assure.assure.sanity import Check
+from usdm4_assure.assure.sanity import check as sanity_check
 from usdm4_assure.assure.verify import verify_deterministic, verify_llm
 from usdm4_assure.contracts import (
     AssuredField,

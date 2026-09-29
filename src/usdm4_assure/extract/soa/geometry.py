@@ -41,15 +41,15 @@ _MIN_COVERAGE = 0.30          # of the table's height/width, for a rule to defin
 _MARK = re.compile(r"^\s*[xX\u2713\u2714\u2022\u25cf\u25a0\u221a\u00d7](?:$|[\s(\[,;.\u00b9\u00b2\u00b3\u2070-\u209f\u1d2c-\u1d6a])")
 _WINDOW = re.compile(r"^\(?\s*(?:[±+\-−]|\+/-)\s*\d|^\d+\s*days?\)?$|^window", re.IGNORECASE)
 _EPOCH_NAMES = (
-    (re.compile(r"^screen", re.I), "Screening Period"),
-    (re.compile(r"^(treatment|dosing|intervention)", re.I), "Treatment Period"),
-    (re.compile(r"^(f/?u|follow)", re.I), "Follow-up Period"),
+    (re.compile(r"^screen", re.IGNORECASE), "Screening Period"),
+    (re.compile(r"^(treatment|dosing|intervention)", re.IGNORECASE), "Treatment Period"),
+    (re.compile(r"^(f/?u|follow)", re.IGNORECASE), "Follow-up Period"),
 )
 _UNIT_HINT = re.compile(r"(?<![a-z])(day|week|month|cycle)s?(?![a-z])\s*(\([^)]*\))?", re.IGNORECASE)
 _ROW_UNIT = re.compile(r"^(study\s+)?(week|day|month)s?\b", re.IGNORECASE)
 _CYCLE = re.compile(r"^(cycle|c)\s*\d+\b", re.IGNORECASE)
 _NARROW = 45.0                # points: a cell this narrow wraps words mid-word
-_EXTENDS_PREVIOUS = re.compile(r"^(et|early term\w*|unscheduled|eot|end of treatment)\b", re.I)
+_EXTENDS_PREVIOUS = re.compile(r"^(et|early term\w*|unscheduled|eot|end of treatment)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -219,7 +219,8 @@ def _lines(page) -> list[_Line]:
                 size = span.get("size", 8.0)
                 token: list[dict] = []
 
-                def flush() -> None:
+                def flush(token: list[dict] = token, rotated: bool = rotated,
+                          reads_up: bool = reads_up) -> None:
                     if token:
                         text = "".join(c["c"] for c in token)
                         xs0 = min(c["bbox"][0] for c in token)
@@ -248,7 +249,7 @@ def _cell_lines(lines: Iterable[_Line], x0: float, x1: float, y0: float, y1: flo
     return [ln for ln in lines if x0 <= ln.cx <= x1 and y0 <= ln.cy <= y1]
 
 
-_FUNCTION_WORDS = re.compile(r"^(and|or|to|of|day|days|the|in|on|at|for|per|by|with)\b", re.I)
+_FUNCTION_WORDS = re.compile(r"^(and|or|to|of|day|days|the|in|on|at|for|per|by|with)\b", re.IGNORECASE)
 
 
 def _merge_wrapped(parts: list[str]) -> list[str]:
@@ -343,7 +344,7 @@ def _norm_epoch(text: str) -> str:
 def _split_label(parts: list[str]) -> tuple[str, str]:
     """``(visit name, window text)`` from a column's header fragments."""
     name = [p for p in parts if not _WINDOW.match(p)]
-    window = [p for p in parts if _WINDOW.match(p) and not re.match(r"^\d+\s*days?\)?$", p, re.I)]
+    window = [p for p in parts if _WINDOW.match(p) and not re.match(r"^\d+\s*days?\)?$", p, re.IGNORECASE)]
     return " ".join(name).strip(), " ".join(window).strip()
 
 
@@ -394,7 +395,6 @@ class _Parsed:
 
 def _parse_table_pages(tables: list[_Table]) -> _Parsed:
     first = tables[0]
-    n_cols = len(first.col_edges) - 1
     # The header is the rows above the first group/mark row; decide the notes column
     # from a provisional two-row header, then re-derive the body start.
     notes_col = _detect_notes_column(first, 1, 2)

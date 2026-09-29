@@ -161,9 +161,8 @@ def test_persistently_empty_response_raises_and_is_not_cached(tmp_path):
     llm.api_key, llm.available = "fake-key", True
 
     with patch("usdm4_assure.llm.openrouter.requests.post",
-               side_effect=[_ok(""), _ok("   ")]):
-        with pytest.raises(RuntimeError, match="empty"):
-            llm.complete("hello", max_tokens=1000)
+               side_effect=[_ok(""), _ok("   ")]), pytest.raises(RuntimeError, match="empty"):
+        llm.complete("hello", max_tokens=1000)
 
     key = cache_key("test/model", [{"role": "user", "content": "hello"}], 1000)
     assert cache.get(key) is None            # a failure must never be replayed
