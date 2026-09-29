@@ -74,7 +74,10 @@ uses independent deterministic methods, and an LLM member joins automatically vi
 
 ## Status
 
-A working proof-of-concept — one protocol PDF → a structurally-valid USDM 4.0 study across
-six domains, 18 passing tests, fully Dockerized — currently mid-revision to the v0.3
-architecture. See [`../PLAN.md`](../PLAN.md) §6 for the phased roadmap and exit criteria,
-and [Conformance](conformance.md) for exactly where CORE-clean output stands today.
+Phases 0–6 of the v0.3 architecture (see [`../PLAN.md`](../PLAN.md) §6) are implemented:
+one protocol PDF → a structurally-valid, quote-grounded USDM 4.0 study across seven domains
+(metadata, design, eligibility, objectives, estimands, organizations/sites, Schedule of
+Activities), routed through a section graph with prohibited-scope filtering, a Part 11 audit
+trail, an HTMX certification UI, and a bounded validate→re-extract→repair loop — 445 passing
+tests, fully Dockerized. See [Conformance](conformance.md) for exactly where CORE-clean
+output stands today (down to 5 failing d4k rules on the reference fixture, from 12).

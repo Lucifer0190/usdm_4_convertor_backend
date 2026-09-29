@@ -36,57 +36,60 @@ metadata, design, eligibility, objectives, and a Schedule of Activities):
 |---|---|
 | Structural gate | **PASS** |
 | Assembler errors | **0** |
-| d4k findings | **22** (down from 24 before C3/C4) |
-| d4k failing rules | **12** (down from 14) |
+| d4k findings | **9** (down from 22 before Phase 6) |
+| d4k failing rules | **5** (down from 12) |
 | Entities | 3 arms, 3 epochs, 5 encounters, 5 activities, 5 scheduled instances |
 | Phase | resolved to CDISC `C15601` (Phase II Trial) |
 
 Adding domains demonstrably clears rules: `DDF00097` (planned age range) cleared by the
-eligibility demographics, and `DDF00213` (interventions expected for a parallel design)
-cleared by the derived interventions.
+eligibility demographics, `DDF00213` (interventions expected for a parallel design) cleared
+by the derived interventions, and Phase 6 (tasks 6.1–6.5) cleared `DDF00084`/`DDF00041`
+(objectives attachment), `DDF00172`/`DDF00201` (sponsor identity/role), `DDF00006`/`DDF00025`
+(timing windows), `DDF00153` (planned duration), and `DDF00087`/`DDF00088` (linked-list
+ordering) — see below for exactly how, and why two of those were assumed to be pure
+assembler bugs (Bucket 1) until they turned out to be fixable from our side after all.
 
 ## Why the study is not yet CORE-clean — and where the blocker is
 
-The residual d4k findings split into three buckets. **Critically, a large share is gated
-by the upstream data4knowledge assembler, not by our extraction layer.** This is
-confirmed by the assembler's own integration test
-(`tests/usdm4/integration/test_assembler_to_core.py`), which pins a set of known-failing
-rules on its minimum fixture.
+**Phase 6 (CP6-A/B) closed six of the nine rules this page used to call "Bucket 1/2/3", and
+found that two of them were never assembler bugs at all.** The lesson worth stating plainly:
+"the assembler doesn't do X" needs to be checked against the real assembled objects and the
+real rule engine before it's trusted, not inferred from a failing-rules list alone —
+`assemble/fallback.py`'s `repair_timeline()` and `assemble/sites.py` are what actually fixed
+these, none of them by extracting more data:
 
-### Bucket 1 — Upstream assembler gaps (cannot be fixed from our input)
+- **`DDF00084`/`DDF00041` (objective attachment) and `DDF00172`/`DDF00201` (sponsor identity
+  /role)** were genuinely fixable from our input, not the assembler — see `assemble/sanitize.py`
+  and `assemble/study.py`'s sponsor-scope fix (task 6.3). The sponsor's identifier scope was
+  `{"standard": "sponsor"}`, an invalid value (`standard` only accepts registry/regulator
+  keys); the assembler silently dropped the identifier, organisation and role as a result.
+- **`DDF00006`/`DDF00025` (timing windows)** were never a missing-data problem: supplying
+  `windows: {"items": []}` makes `TimelineAssembler` fall into its own out-of-range `"???"`
+  placeholder for every timing, which reads as a *defined but incomplete* window — confirmed
+  against the live d4k engine. The fix is one all-zero `Window` per timepoint, not real
+  tolerance data (task 6.5, `soa/timing.py`).
+- **`DDF00153` (planned duration) and `DDF00087`/`DDF00088` (linked-list ordering)** have no
+  input field at all (`plannedDuration` is hardcoded `None`; `Encounter`/`StudyEpoch` are
+  never `double_link`-ed, only `Activity` is) — both set directly on the assembled objects
+  after `execute()` returns (task 6.5, `assemble/soa.repair_timeline()`).
+
+### What is still failing, and why
 
 | Rule(s) | Requirement | Status |
 |---|---|---|
-| `DDF00084`, `DDF00041` | Exactly one primary objective / at least one primary endpoint | We extract a valid objective + endpoint and pass them in correctly, but the assembler does **not** attach objectives to the study design (`studyDesign.objectives == 0`). |
-| `DDF00172`, `DDF00201` | Exactly one sponsor study identifier / sponsor study role | Sponsor `StudyRole` emission is a known assembler gap. |
-| `DDF00101` | An interventional study references an intervention from a procedure | Requires activity `definedProcedures` to reference interventions — not wired by the assembler. |
-
-### Bucket 2 — Domains needing richer data we do not extract yet
-
-| Rule(s) | Requirement |
-|---|---|
-| `DDF00006`, `DDF00025`, `DDF00031` | SoA timing windows / fixed reference timing types / relative anchors |
-| `DDF00075` | `biomedicalConceptIds` on activities |
-| `DDF00153` | A planned duration for the main timeline |
-
-### Bucket 3 — Structural
-
-| Rule(s) | Requirement |
-|---|---|
-| `DDF00087`, `DDF00088` | Linked-list ordering integrity (`previousId` / `nextId`) |
+| `DDF00101` | An interventional study references an intervention from a procedure | Requires activity `definedProcedures` to reference interventions — not wired by the assembler; no extraction gap to close. |
+| `DDF00140`, `DDF00200` | Organisation type from the CDISC organisation-type codelist | The sponsor's organisation type is not extracted; recorded honestly as CDISC `Unknown`, which the codelist itself doesn't include as a valid entry. |
+| `DDF00031` | A non-anchor timing must point to two distinct scheduled instances | **A rule-library bug, confirmed live**: the check compares `Timing.type.decode` against the short string `"Fixed Reference"`, but the real decode `TimelineAssembler` produces is `"Fixed Reference Timing Type"` — the exact same code/decode mismatch `DDF00025`'s own fix history documents, just not applied here too. Not an extraction gap. |
+| `DDF00075` | `biomedicalConceptIds`/`bcSurrogateIds`/etc. on activities | Investigated (task 6.5): offering an activity's own name as a biomedical concept does get a real exact-name match sometimes, but `TimelineAssembler`'s own procedure-creation path also mints a `Procedure` for every such name sharing one hardcoded placeholder LOINC code `"12345"` — trading this `WARNING` for a fabricated-code `ERROR` (`DDF00035`). Left as a documented gap rather than manufactured data. |
 
 ## Implication for the roadmap
 
-To reach CORE-clean output, the work is **not** in the AI extraction layer (which is
-producing valid, correct content). It is one of:
-
-1. **Contribute fixes upstream** to the data4knowledge assembler (objective attachment,
-   sponsor role emission, procedure→intervention references); or
-2. **Construct the affected USDM parts ourselves** via the lower-level `usdm4.builder`,
-   bypassing the assembler for those entities — a larger, self-contained effort to budget;
-   and
-3. **Extract the remaining data** (SoA timing windows, biomedical concepts, timeline
-   duration) to satisfy Bucket 2.
+Two rules remain genuinely gated upstream (`DDF00101`, `DDF00031`) and one needs richer
+extraction this project doesn't attempt (`DDF00140`/`DDF00200`, sponsor organisation type;
+`DDF00075`, biomedical concept coding — deliberately not forced, see above). None of the
+three block a valid, CORE-submittable study; `validate/repair.py`'s `RULE_MAP` documents each
+one's status and why it is not (yet, or ever, without upstream or added-scope work) fixed
+from this project's side.
 
 This is exactly the kind of maturity risk a proof-of-concept exists to surface: the
 pipeline architecture is sound and the extractors work; full conformance depends partly

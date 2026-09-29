@@ -6,7 +6,41 @@ yet semantically versioned.
 
 ## [Unreleased]
 
-### Phase 6 in progress — Hard domains + repair loop (CP6-A)
+### Phase 6 complete — Hard domains + repair loop (v0.3.6, CP6-A–B)
+
+**Major milestone:** the reference fixture's failing d4k rules dropped from 12 to 5.
+Six of those seven were fixed without extracting a single new field — reading the
+assembler's own errors (which turned out to be silently discarded), a wrong identifier
+scope, an out-of-range placeholder string, and two hardcoded-`None`/never-linked fields
+account for all of it. Only one of the rules originally filed as an "upstream assembler
+gap" turned out to actually be one on closer inspection (`DDF00101`); the rest were ours
+to fix once the real cause was found instead of assumed. See `docs/conformance.md` for
+the full before/after per rule.
+
+CP6-B (tasks 6.4–6.6):
+- **Organizations, sites and study roles (task 6.4)** — `extract/sites.py` / `assemble/sites.py`:
+  a Contract Research Organization and central/reference laboratory (the two a protocol
+  usually names beyond the sponsor), built directly with the assembler's own `Builder` since
+  `identification.roles` can only represent 3 hardcoded organization roles. A genuine
+  investigational-site roster is out of scope (it essentially never appears in the protocol
+  body) and stays a documented absence, not a guess.
+- **SoA timing windows and anchors (task 6.5)** — `soa/timing.py`: root-caused DDF00006/
+  DDF00025 against the live d4k engine (an empty `windows.items` list makes the assembler
+  emit its own `"???"` placeholder, which reads as a defined-but-incomplete window on every
+  timing) and fixed it with one real, parsed-or-zero `Window` per visit column.
+  `assemble/soa.repair_timeline()` sets `ScheduleTimeline.plannedDuration` (hardcoded `None`
+  in the assembler — DDF00153) and `double_link`s `Encounter`/`StudyEpoch` (never done by the
+  assembler, only `Activity` is — DDF00087/DDF00088), both directly on the assembled objects.
+  Investigated and deliberately not done: satisfying DDF00075 (biomedical concept ids) via
+  the assembler's own `actions.bcs` mechanism also mints a `Procedure` with one hardcoded
+  placeholder LOINC code shared across every activity, trading a `WARNING` for a
+  fabricated-code `ERROR` — left as a documented gap rather than manufactured data.
+  `build_soa()`'s `assembler_errors` had the same `Errors`-has-no-`.errors` bug found in 6.3.
+- **Docs (task 6.6)** — `docs/conformance.md`'s bucket tables rewritten against current
+  measurements (9 findings / 5 failing rules, down from 22 / 12) with exactly how six rules
+  were actually fixed; `docs/modules.md`, `docs/pipeline.md`, `docs/index.md` refreshed.
+
+CP6-A (tasks 6.1–6.3):
 
 - **Estimands (task 6.1)** — `extract/estimands.py` / `assemble/estimands.py`: grounded
   ICH E9(R1) estimands from three members (deterministic, `hard_reasoning`, `extract_alt`),
@@ -36,7 +70,7 @@ Fixed:
   pass; DDF00140/DDF00200 now fail instead, because the sponsor's organisation type is not
   extracted and is honestly recorded as CDISC "Unknown" (task 6.4 extracts organisations).
 
-### Phase 5 in progress — Review UI + certification (v0.3.5, CP5-A)
+### Phase 5 complete — Review UI + certification (v0.3.5, CP5-A)
 
 **Major milestone:** `run_full()` now writes a Part 11 audit trail — every field decision
 was already designed for this (`contracts_audit.AuditRecord`, `audit/store.py`'s append-only

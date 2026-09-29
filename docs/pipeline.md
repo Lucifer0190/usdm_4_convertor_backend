@@ -2,12 +2,13 @@
 
 > **v0.3 note.** This page describes the ten-layer pipeline (see
 > [Architecture](architecture.md)). The implementation is being built in the phases
-> described in [`../PLAN.md`](../PLAN.md). As of Phase 5 (CP5-A, 2026-09-28), the
+> described in [`../PLAN.md`](../PLAN.md). As of Phase 6 (CP6-B, 2026-09-29), the
 > implemented layers are L0 (ingest), L1–L2 (layout + multi-page SoA stitching), L3
-> (routing), L4 (sharded extraction), L5 (grounding), L6 (assurance + completeness +
-> calibrated confidence/conformal), L7 (assembly), L8 (validation), and L9
-> (certification: `run_full()` now writes the Part 11 audit trail every field decision
-> was already designed for, and `review/app.py` reads it — see `docs/review.md`).
+> (routing), L4 (sharded extraction, now C1–C6: metadata, design, eligibility,
+> objectives, estimands, organizations/sites), L5 (grounding), L6 (assurance +
+> completeness + calibrated confidence/conformal), L7 (assembly — a sanitizer that
+> reports every repair instead of silently defaulting, per-section fallback, a bounded
+> validate→re-extract→re-validate repair loop), L8 (validation), and L9 (certification).
 > **Not yet wired into `run_full()`'s triage:** the Phase 4 confidence model and
 > conformal threshold exist and are tested (`assure/confidence.py`, `assure/conformal.py`,
 > `usdm4 eval`), but `assure()`'s triage still uses the original hand-set formula — there
@@ -18,7 +19,8 @@ Two entry points, both in `usdm4_assure.pipeline`:
 
 - `run(pdf)` — the metadata-only spine (C1). The smallest slice that touches every layer.
 - `run_full(pdf)` — the full loop across metadata (C1), design (C2), eligibility (C3),
-  objectives (C4), and the Schedule of Activities.
+  objectives (C4), estimands (C5), organizations/sites (C6), and the Schedule of Activities.
+  `previous_version=<pdf>` also diffs and assembles an amendment (task 6.2).
 
 ## Current data flow
 
