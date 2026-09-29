@@ -12,8 +12,8 @@ from usdm4_assure.llm.base import LLM, ModelTier, tier_for
 # Pinned model ids per tier. Update here only.
 TIER_MODEL: dict[ModelTier, str] = {
     ModelTier.HAIKU: "claude-haiku-4-5-20251001",
-    ModelTier.SONNET: "claude-sonnet-5",
-    ModelTier.OPUS: "claude-opus-4-8",
+    ModelTier.SONNET: "claude-sonnet-5-5",
+    ModelTier.OPUS: "claude-opus-5-5",
 }
 
 # Extended-thinking budget (tokens) per tier; 0 = off.

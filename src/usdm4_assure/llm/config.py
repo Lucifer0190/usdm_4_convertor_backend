@@ -37,13 +37,13 @@ def slm_model() -> str:
 
 
 _DEFAULT_ROLE_MODELS: dict[str, str] = {
-    "extract": "anthropic/claude-sonnet-4.5",
-    "extract_alt": "openai/gpt-5.1",
+    "extract": "anthropic/claude-sonnet-5.5",
+    "extract_alt": "openai/gpt-6-sol",
     "verify": "google/gemini-3.1-pro-preview",
     "vision": "google/gemini-3.1-pro-preview",
-    "vision_alt": "anthropic/claude-sonnet-4.5",
-    "hard_reasoning": "anthropic/claude-opus-4.8",
-    "route": "anthropic/claude-sonnet-4.5",
+    "vision_alt": "anthropic/claude-sonnet-5.5",
+    "hard_reasoning": "anthropic/claude-opus-5.5",
+    "route": "anthropic/claude-sonnet-5.5",
 }
 
 

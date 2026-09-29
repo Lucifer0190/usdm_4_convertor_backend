@@ -36,8 +36,8 @@ _BACKOFF_BASE_SECONDS = 1.0
 # Default Claude tier -> OpenRouter slug (current catalog).
 _DEFAULT_TIER_MODEL: dict[ModelTier, str] = {
     ModelTier.HAIKU: "anthropic/claude-haiku-4.5",
-    ModelTier.SONNET: "anthropic/claude-sonnet-4.5",
-    ModelTier.OPUS: "anthropic/claude-opus-4.8",
+    ModelTier.SONNET: "anthropic/claude-sonnet-5.5",
+    ModelTier.OPUS: "anthropic/claude-opus-5.5",
 }
 
 

@@ -1,13 +1,18 @@
 # OpenRouter model roles — evidence-based, frontier-LLM first.
 # See DEVPLAN.md §M for the accuracy-vs-cost analysis.
 # Every role is one environment variable away from a different model (USDM4_MODEL_<ROLE>).
+#
+# Refreshed 2026-09-29 against the live OpenRouter catalog. Like-for-like: each role keeps
+# its tier and moves to the newest release of that tier (not to the top flagship).
+#   Sonnet 4.5 -> Sonnet 5.5 | GPT-5.1 -> GPT-6 Sol | Opus 4.8 -> Opus 5.5
+#   Google: gemini-3.1-pro-preview is still the newest Pro; gemini-3.5..3.8 are Flash-tier.
 
 roles:
   # All-domain text extraction (default tier, C1–C4).
-  extract: anthropic/claude-sonnet-4.5
+  extract: anthropic/claude-sonnet-5.5
 
   # Second ensemble member (must differ in family from extract for genuine cross-family verification).
-  extract_alt: openai/gpt-5.1
+  extract_alt: openai/gpt-6-sol
 
   # Quote↔value NLI check on the uncertain subset (third family, independent of extract + extract_alt).
   verify: google/gemini-3.1-pro-preview
@@ -16,13 +21,13 @@ roles:
   vision: google/gemini-3.1-pro-preview
 
   # SoA cell cross-check (different VLM family, invoked only on grid disagreement).
-  vision_alt: anthropic/claude-sonnet-4.5
+  vision_alt: anthropic/claude-sonnet-5.5
 
   # Estimands, amendments, cross-section reasoning (hardest tier, most capable).
-  hard_reasoning: anthropic/claude-opus-4.8
+  hard_reasoning: anthropic/claude-opus-5.5
 
   # Section routing residue (anything not deterministically typed, after deterministic detection).
-  route: anthropic/claude-sonnet-4.5
+  route: anthropic/claude-sonnet-5.5
 
 constraints:
   # These three must all be different families for genuine cross-family signals.

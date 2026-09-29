@@ -279,7 +279,7 @@ All traffic runs through **OpenRouter** behind `llm/router.py`, with roles decla
 `config/models.yaml` so any model is swappable per role without code changes. Already
 implemented: `llm/openrouter.py`, `llm/config.py`, and role-based routing.
 
-**Strategy: accuracy first.** Frontier models (Claude Sonnet 4.5, GPT-5.1, Gemini 3.1 Pro)
+**Strategy: accuracy first.** Frontier models (Claude Sonnet 5.5 / Opus 5.5, GPT-6 Sol, Gemini 3.1 Pro)
 are the default for all roles. Small models (Llama-3.1-8B, Qwen, gpt-oss-20b) are not in the
 design — the published evidence shows frontier models outperform them in every measured
 domain. **The one specialist that survives:** MinerU2.5 (1.2B) beats Gemini-2.5-Pro on
@@ -295,13 +295,13 @@ locally (CPU-viable for both) if needed; they are not behind OpenRouter.
 | Tier | Component | Job | Model(s) | Notes |
 |---|---|---|---|---|
 | Deterministic (local) | PyMuPDF · Docling · **MinerU2.5** | text layer, layout, table grids, stitching | n/a — local libraries | 1.2B specialist beats Gemini on TEDS |
-| Extract (primary) | LLM C1–C4 all-domain text | `anthropic/claude-sonnet-4.5` | Frontier default | verified live 2026-09-17 |
-| Extract (cross-family) | LLM C1–C4 ensemble member | `openai/gpt-5.1` | Different family from extract | cross-family ρ=0.54; new-family signal needed |
+| Extract (primary) | LLM C1–C4 all-domain text | `anthropic/claude-sonnet-5.5` | Frontier default | verified live 2026-09-29 |
+| Extract (cross-family) | LLM C1–C4 ensemble member | `openai/gpt-6-sol` | Different family from extract | cross-family ρ=0.54; new-family signal needed |
 | Verify (NLI) | LLM quote↔value checking | `google/gemini-3.1-pro-preview` | Third family; never extractor judging itself | frontier NLI accuracy unmeasured vs Llama/Qwen |
 | Vision (cell content) | VLM SoA cell text, first pass | `google/gemini-3.1-pro-preview` | Frontier VLM | no evidence 30B VLMs match frontier |
-| Vision (cross-check) | VLM cell cross-family signal | `anthropic/claude-sonnet-4.5` | Different family from vision | cross-family diversity needed |
-| Hard reasoning | LLM estimands, amendments, cross-section | `anthropic/claude-opus-4.8` | Escalation tier | hardest reasoning tier |
-| Section routing (residue) | LLM untyped-section fallback | `anthropic/claude-sonnet-4.5` | After deterministic detection | only residue after bookmarks/ToC/headings |
+| Vision (cross-check) | VLM cell cross-family signal | `anthropic/claude-sonnet-5.5` | Different family from vision | cross-family diversity needed |
+| Hard reasoning | LLM estimands, amendments, cross-section | `anthropic/claude-opus-5.5` | Escalation tier | hardest reasoning tier |
+| Section routing (residue) | LLM untyped-section fallback | `anthropic/claude-sonnet-5.5` | After deterministic detection | only residue after bookmarks/ToC/headings |
 
 **Rules.**
 - **Cross-family verification only** (ρ = 0.54 cross vs 0.77 within), and **verify only the
