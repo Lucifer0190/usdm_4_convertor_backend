@@ -39,12 +39,19 @@ _SPONSOR_ORGS = {"drug company", "pharmaceutical company", "sponsor"}
 
 # --- text helpers ------------------------------------------------------------------- #
 def _norm(text: str | None) -> str:
-    t = (text or "").replace("â€‘", "-").replace("‑", "-").lower()
+    t = (text or "").replace("â€‘", "-").replace("‑", "-").replace("−", "-").lower()
+    t = re.sub(r"(?<![a-z0-9])-(?=\d)", " neg", t)       # "Day -1" must differ from "Day 1"
     return re.sub(r"[^a-z0-9 ]+", " ", t)
 
 
 def _tokens(text: str | None) -> set[str]:
-    return {w for w in _norm(text).split() if len(w) > 2 and w not in _STOP}
+    """Content words (3+ letters) plus every token holding a digit.
+
+    Numbers are what tell visits apart ("Day 1" / "Day 15", "Visit 1" / "Visit 10"), so they
+    are never dropped as short words.
+    """
+    return {w for w in _norm(text).split()
+            if (len(w) > 2 or any(ch.isdigit() for ch in w)) and w not in _STOP}
 
 
 def _jaccard(a: str | None, b: str | None) -> float:

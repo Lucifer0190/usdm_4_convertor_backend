@@ -81,3 +81,11 @@ def test_categories_absent_from_the_reference_are_not_scored():
     ref = _study(design={"scheduleTimelines": []})
     s = score_study(_study(), ref)
     assert "marks" not in s.categories
+
+
+def test_numbers_tell_visits_apart():
+    from usdm4_assure.eval.rubric import _jaccard
+    assert _jaccard("Day 1", "Day 15") < 0.5
+    assert _jaccard("Visit 1", "Visit 10") < 0.5
+    assert _jaccard("Day -1", "Day 1") < 0.5
+    assert _jaccard("Cycle 1 Day 1", "Cycle 1 Day 1") == 1.0
