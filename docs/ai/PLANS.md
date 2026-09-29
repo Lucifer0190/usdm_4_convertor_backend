@@ -7,7 +7,6 @@ H-4 | Push dev to the backend repo (origin set) | Trello | PLAN.md CP-A
 Q-4 | Audited gold for train and held-out studies (needs owner, decision D1) | Trello | PLAN.md CP-C
 
 ## Next (max 7)
-Q-3 | One benchmark run with --llm (D3 approved) | Trello | PLAN.md CP-C
 C-1 | SoA layouts still failing | Trello | PLAN.md CP-D
 C-2 | AI vision SoA reader with geometry cross-check | Trello | PLAN.md CP-D
 B-2 | Async job API | Trello | PLAN.md CP-B
