@@ -28,6 +28,8 @@ docs = ["mkdocs-material>=9.5"]
 eval = ["pandas>=2.0", "pyarrow>=14"]
 # HTMX review UI (Phase 5). `uvicorn usdm4_assure.review.app:app` to run it.
 review = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "jinja2>=3.1", "python-multipart>=0.0.9"]
+# HTTP conversion service (src/usdm4_api): POST a protocol PDF, receive USDM JSON.
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "python-multipart>=0.0.9", "httpx>=0.27"]
 # Multi-page SoA table structure (Phase 2). Optional: layout/*_adapter.py return
 # [] when these are absent, so the deterministic PyMuPDF path always works standalone.
 layout = ["docling>=2.0", "mineru>=2.5"]

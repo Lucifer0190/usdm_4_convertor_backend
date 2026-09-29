@@ -11,6 +11,31 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 
+  # Conversion API: POST a protocol PDF to /v1/convert, receive its USDM 4.0 JSON (docs/api.md).
+  # Set USDM4_API_KEYS before exposing it; without it the service is open.
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: usdm4-assure:dev
+    entrypoint: []
+    command: uvicorn usdm4_api.app:app_factory --factory --host 0.0.0.0 --port 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data          # audit trail + LLM cache persist here
+    environment:
+      - OPEN_ROUTER_KEY=${OPEN_ROUTER_KEY:-}
+      - USDM4_API_KEYS=${USDM4_API_KEYS:-}
+      - USDM4_MAX_CONCURRENT=${USDM4_MAX_CONCURRENT:-2}
+      - USDM4_NO_LLM=${USDM4_NO_LLM:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    profiles: ["api"]
+
   # CORE conformance engine — pinned separately; run as a one-shot validation gate.
   # Placeholder: the spike wires cdisc-rules-engine here once the CLI invocation is proven.
   core:
