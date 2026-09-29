@@ -35,9 +35,15 @@ from usdm4_assure.llm.base import LLM
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-# How much of the document each pass sees. Generous enough for a real protocol
-# section; bounded so a large PDF doesn't blow the model's context.
-_MAX_DOC_CHARS = 12000
+# How much of the document each pass sees. Callers hand a narrow, section-level
+# window (extract/slots.py), so this is a safety bound, not the working size.
+# It was 12,000 characters, which cut a real eligibility or objectives section
+# off after its first page or two.
+_MAX_DOC_CHARS = 40000
+# Output budgets. Pass 2 emits a JSON list whose size scales with the number of
+# records (five estimands need far more than the 1,600 tokens it used to get).
+_PASS1_TOKENS = 2000
+_PASS2_TOKENS = 6000
 
 
 @cache
@@ -84,10 +90,10 @@ def run_two_pass(llm: LLM, prompt_id: str, document_text: str, **values: str
     text = document_text[:_MAX_DOC_CHARS]
     try:
         reasoning = llm.complete(_fill(_load_template(p1_name), document_text=text, **values),
-                                 task="extract_prose", max_tokens=800)
+                                 task="extract_prose", max_tokens=_PASS1_TOKENS)
         raw = llm.complete(_fill(_load_template(p2_name), reasoning=reasoning,
                                  document_text=text, **values),
-                           task="extract_prose", max_tokens=1600)
+                           task="extract_prose", max_tokens=_PASS2_TOKENS)
         return _parse_json_items(raw)
     except Exception:  # noqa: BLE001 — a bad LLM member must not crash the run
         return None

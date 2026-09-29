@@ -32,6 +32,11 @@ _ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
 _MAX_ATTEMPTS = 4
 _BACKOFF_BASE_SECONDS = 1.0
+# An empty completion means the model spent its whole budget before answering (a
+# reasoning model's thinking counts against ``max_tokens``). Retry once with a
+# larger budget; the cap keeps a runaway prompt from asking for an absurd one.
+_EMPTY_RETRY_FACTOR = 2
+_MAX_RETRY_TOKENS = 16000
 
 # Default Claude tier -> OpenRouter slug (current catalog).
 _DEFAULT_TIER_MODEL: dict[ModelTier, str] = {
@@ -107,7 +112,7 @@ class OpenRouterLLM(LLM):
             if cached is not None:
                 return cached
 
-        text = self._call_with_retry(model, messages, max_tokens)
+        text = self._call_checked(model, messages, max_tokens)
 
         if self._cache is not None:
             self._cache.put(key, model=model, prompt_hash=key, response=text)
@@ -149,10 +154,28 @@ class OpenRouterLLM(LLM):
             if cached is not None:
                 return cached
 
-        text = self._call_with_retry(model, messages, max_tokens)
+        text = self._call_checked(model, messages, max_tokens)
 
         if self._cache is not None:
             self._cache.put(key, model=model, prompt_hash=key, response=text)
+        return text
+
+    def _call_checked(self, model: str, messages: list[dict], max_tokens: int) -> str:
+        """One completion that must contain text.
+
+        An empty answer is retried once with a larger token budget. If it is
+        still empty the call raises: an empty string looks like "the model found
+        nothing", which is exactly how the failure used to go unnoticed.
+        """
+        text = self._call_with_retry(model, messages, max_tokens)
+        if text.strip():
+            return text
+        bigger = min(max_tokens * _EMPTY_RETRY_FACTOR, _MAX_RETRY_TOKENS)
+        text = self._call_with_retry(model, messages, bigger)
+        if not text.strip():
+            raise RuntimeError(
+                f"{model} returned an empty completion twice "
+                f"(max_tokens {max_tokens} then {bigger})")
         return text
 
     def _call_with_retry(self, model: str, messages: list[dict], max_tokens: int) -> str:

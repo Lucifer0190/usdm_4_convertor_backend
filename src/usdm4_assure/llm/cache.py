@@ -67,10 +67,17 @@ class LLMCache:
         row = self._conn.execute(
             "SELECT response FROM completions WHERE key = ?", (key,)
         ).fetchone()
-        return row[0] if row else None
+        # Rows written before empty responses were refused are misses, not answers.
+        return row[0] if row and row[0].strip() else None
 
     def put(self, key: str, *, model: str, prompt_hash: str, response: str) -> None:
-        """Store a response under ``key``, overwriting any prior entry."""
+        """Store a response under ``key``, overwriting any prior entry.
+
+        An empty (or whitespace-only) response is a failed call, not an answer:
+        it is never stored, so a re-run retries instead of replaying the failure.
+        """
+        if not response.strip():
+            return
         self._conn.execute(
             "INSERT OR REPLACE INTO completions "
             "(key, model, prompt_hash, response, created_at) VALUES (?, ?, ?, ?, ?)",

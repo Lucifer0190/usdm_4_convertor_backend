@@ -130,3 +130,54 @@ def test_exhausts_retries_and_raises(tmp_path):
         llm.complete("hello")
 
     assert mock_post.call_count == 4
+
+
+# --- call contract: empty answers are errors, never cached ------------------------ #
+def _ok(text):
+    r = Mock(status_code=200)
+    r.json.return_value = {"choices": [{"message": {"content": text}}]}
+    return r
+
+
+def test_empty_response_is_retried_with_a_larger_budget_and_never_cached(tmp_path):
+    cache = LLMCache(tmp_path / "llm.sqlite")
+    llm = OpenRouterLLM(model="test/model", cache=cache)
+    llm.api_key, llm.available = "fake-key", True
+
+    with patch("usdm4_assure.llm.openrouter.requests.post",
+               side_effect=[_ok(""), _ok("real answer")]) as post:
+        out = llm.complete("hello", max_tokens=1000)
+
+    assert out == "real answer"
+    budgets = [c.kwargs["json"]["max_tokens"] for c in post.call_args_list]
+    assert budgets == [1000, 2000]          # one retry, budget doubled
+    key = cache_key("test/model", [{"role": "user", "content": "hello"}], 1000)
+    assert cache.get(key) == "real answer"   # the good answer is cached, under the asked budget
+
+
+def test_persistently_empty_response_raises_and_is_not_cached(tmp_path):
+    cache = LLMCache(tmp_path / "llm.sqlite")
+    llm = OpenRouterLLM(model="test/model", cache=cache)
+    llm.api_key, llm.available = "fake-key", True
+
+    with patch("usdm4_assure.llm.openrouter.requests.post",
+               side_effect=[_ok(""), _ok("   ")]):
+        with pytest.raises(RuntimeError, match="empty"):
+            llm.complete("hello", max_tokens=1000)
+
+    key = cache_key("test/model", [{"role": "user", "content": "hello"}], 1000)
+    assert cache.get(key) is None            # a failure must never be replayed
+
+
+def test_cache_put_refuses_empty_responses(tmp_path):
+    cache = LLMCache(tmp_path / "llm.sqlite")
+    cache.put("k", model="m", prompt_hash="k", response="")
+    cache.put("k2", model="m", prompt_hash="k2", response="  \n")
+    assert cache.get("k") is None and cache.get("k2") is None
+
+
+def test_cache_get_treats_legacy_empty_rows_as_a_miss(tmp_path):
+    cache = LLMCache(tmp_path / "llm.sqlite")
+    cache._conn.execute("INSERT INTO completions VALUES ('old', 'm', 'old', '', 0)")
+    cache._conn.commit()
+    assert cache.get("old") is None
