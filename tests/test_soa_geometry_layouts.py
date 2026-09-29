@@ -7,8 +7,10 @@ import pytest
 
 from usdm4_assure.extract.soa.geometry import (
     _CYCLE,
+    _is_prose,
     _name_from_roles,
     _strip_footnote,
+    _visit_key,
     read_soa_geometry,
 )
 
@@ -94,3 +96,44 @@ def test_a_continuation_page_missing_a_column_rule_is_still_one_table(tmp_path):
     assert {v for a, v in g.cells if a == ecg} == {1}                   # mapped by position
     ae = g.activities.index("AE review")
     assert 2 in {v for a, v in g.cells if a == ae}
+
+
+@pytest.mark.parametrize(("a", "b"), [
+    ("Cycle 1 Day 1", "Cycle 1 Day 1 0 h (within 2.5 h prior to dose ** )"),
+    ("Cycle 2 Day 1", "Cycle 2 Day 1 5-7"), ("EOT / Withdrawal", "EoT/Withdra wal")])
+def test_a_pk_table_column_is_the_same_visit_as_the_main_schedule(a, b):
+    assert _visit_key(a) == _visit_key(b)
+
+
+@pytest.mark.parametrize(("a", "b"), [("Weeks 1-4", "Weeks 5-8"), ("Day 1", "Day 15"),
+                                      ("Day -1", "Day 1")])
+def test_different_visits_keep_different_keys(a, b):
+    assert _visit_key(a) != _visit_key(b)
+
+
+def test_a_sentence_across_the_table_is_prose_not_a_header():
+    assert _is_prose("The purpose of the prescreening visit is to obtain blood samples to "
+                     "evaluate the participant's status. Screening activities may be performed.")
+    assert not _is_prose("Active Treatment Phase (1 Cycle = 28 days)")
+
+
+def test_a_later_table_repeating_main_visits_adds_marks_not_visits(tmp_path):
+    xs = [40, 160, 230, 300, 370]
+    main = [["Protocol Activity", "Screening", "Cycle 1 Day 1", "Cycle 2 Day 1"],
+            ["Consent", "X", "", ""], ["Labs", "X", "X", "X"]]
+    pk = [["PK Activity", "Cycle 1 Day 1 0 h", "Cycle 1 Day 1 2 h", "Cycle 2 Day 1 0 h", "Notes"],
+          ["PK sample", "X", "X", "X", ""]]
+    path = _pdf(tmp_path, [lambda p: _table(p, 80, xs, main),
+                           lambda p: _table(p, 80, [40, 160, 230, 300, 370, 520], pk)])
+    g = read_soa_geometry(path)
+    assert g.visits == ["Screening", "Cycle 1 Day 1", "Cycle 2 Day 1"]
+    pk_row = g.activities.index("PK sample")
+    assert {v for a, v in g.cells if a == pk_row} == {1, 2}
+
+
+def test_a_comments_column_is_not_a_visit(tmp_path):
+    xs = [40, 160, 230, 300, 470]
+    rows = [["General Activities", "Prescreening", "Day 1", "Comments"],
+            ["Consent", "X", "", "Must be signed first"], ["Demography", "X", "X", ""]]
+    g = read_soa_geometry(_pdf(tmp_path, [lambda p: _table(p, 80, xs, rows)]))
+    assert g.visits == ["Prescreening", "Day 1"]

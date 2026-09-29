@@ -49,11 +49,15 @@ _UNIT_HINT = re.compile(r"(?<![a-z])(day|week|month|cycle)s?(?![a-z])\s*(\([^)]*
 _ROW_UNIT = re.compile(r"^(study\s+)?(week|day|month)s?\b", re.IGNORECASE)
 _CYCLE = re.compile(r"^(cycles?\s*(\d|[≥>≤<]|and\b)|c\d)", re.IGNORECASE)
 # Footnote letters / asterisks after a header label: "EOT / Withdrawal a", "Day 1 b, c", "±2d*".
-_FOOTNOTE_TAIL = re.compile(r"(?:\s+[a-z](?:\s*,\s*[a-z])*|\s*\*+)+$")
+_FOOTNOTE_TAIL = re.compile(      # after a number, "h" is hours ("0 h"), not a footnote
+    r"(?:(?:(?<!\d)\s+[a-z]|(?<=\d)\s+[a-gi-z])(?:\s*,\s*[a-z])*|\s*\*+)+$")
 # Header-row roles named in the first column. "Visit Identifier" is deliberately not an id
 # row: in some templates it holds the epoch band ("Screen." / "Treatment Period").
 _ROLE_ID = re.compile(r"^visit(?:\s*(?:number|no\.?|#|id)\b|$)", re.IGNORECASE)
 _ROLE_WINDOW = re.compile(r"\bwindow\b", re.IGNORECASE)
+# Sampling time within a visit, as PK tables add it: "0 h (within 2.5 h prior to dose)".
+_TIME_DETAIL = re.compile(r"\s+\d+(?:\.\d+)?\s*(?:-\s*\d+(?:\.\d+)?\s*)?(?:h|hrs?|hours?)\b.*$",
+                          re.IGNORECASE)
 _NARROW = 45.0                # points: a cell this narrow wraps words mid-word
 _EXTENDS_PREVIOUS = re.compile(r"^(et|early term\w*|unscheduled|eot|end of treatment)\b", re.IGNORECASE)
 
@@ -354,8 +358,23 @@ def _split_label(parts: list[str]) -> tuple[str, str]:
     return " ".join(name).strip(), " ".join(window).strip()
 
 
+def _is_prose(text: str) -> bool:
+    """A header cell that is a paragraph (an explanatory note), not a label."""
+    return len(text) > 100 and bool(re.search(r"[a-z]\.\s+[A-Z]|[a-z]\.$", text))
+
+
+def _visit_key(name: str) -> str:
+    """A visit's identity across tables: a PK table's "Cycle 2 Day 1 0 h" and "Cycle 2 Day 1
+    5-7" are both the main schedule's "Cycle 2 Day 1"."""
+    base = _TIME_DETAIL.sub("", name)
+    base = re.sub(r"(\bday\s*-?\d+)\s+\d+\s*-\s*\d+$", r"\1", base, flags=re.IGNORECASE)
+    base = re.sub(r"(?<![\w])[-−](?=\d)", "neg", base)        # "Day -1" is not "Day 1"
+    return re.sub(r"\W+", "", base.lower())
+
+
 def _strip_footnote(text: str) -> str:
-    return _FOOTNOTE_TAIL.sub("", text.strip()).strip()
+    text = re.sub(r"(?<=[A-Za-z])\s+[a-z](?=\s+\()", "", text.strip())   # "Phase b (1 Cycle"
+    return _FOOTNOTE_TAIL.sub("", text).strip()
 
 
 def _name_from_roles(parts: list[tuple[str, str]]) -> tuple[str, str, str]:
@@ -382,7 +401,8 @@ def _detect_notes_column(t: _Table, first_visit_col: int, header_rows: int) -> i
     widths = sorted(t.col_edges[i + 1] - t.col_edges[i] for i in range(first_visit_col, n_cols))
     median = widths[len(widths) // 2] if widths else 0
     wide = (t.col_edges[last + 1] - t.col_edges[last]) > 2.5 * max(median, 1)
-    return last if ("note" in text.lower() or wide) and last > first_visit_col else n_cols
+    is_notes = any(w in text.lower() for w in ("note", "comment", "remark"))
+    return last if (is_notes or wide) and last > first_visit_col else n_cols
 
 
 def _build_table(page, number: int) -> _Table | None:
@@ -460,8 +480,8 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
                 continue
             cell = _cell_lines(first.lines, ex0, ex1, y0, y1)
             text = _join(cell, narrow=(ex1 - ex0) < _NARROW)
-            if not text:
-                continue
+            if not text or _is_prose(text):
+                continue                  # a sentence across the table is a caption, not a header
             unit = _UNIT_HINT.search(text)
             if unit:
                 for c in covered:
@@ -602,19 +622,28 @@ def read_soa_geometry(pdf_path: str | Path, pages: list[int] | None = None) -> S
     activities: list[str] = []
     index_of: dict[str, int] = {}
     cells: set[tuple[int, int]] = set()
+    visit_at: dict[str, int] = {}
     for group in groups:
         parsed = _parse_table_pages(group)
-        offset = len(visits)
-        visits += parsed.visits
-        timings += parsed.timings
-        epochs += parsed.epochs
+        group_start = len(visits)
+        where: list[int] = []            # this table's visit column -> index in the result
+        for name, timing, epoch in zip(parsed.visits, parsed.timings, parsed.epochs, strict=True):
+            key = _visit_key(name)
+            if key and visit_at.get(key, group_start) < group_start:
+                where.append(visit_at[key])          # a visit an earlier table already has
+                continue
+            visit_at.setdefault(key, len(visits))
+            where.append(len(visits))
+            visits.append(name)
+            timings.append(timing)
+            epochs.append(epoch)
         for label, marks in parsed.rows:
             key = re.sub(r"\W+", "", label.lower()) or f"row{len(activities)}"
             if key not in index_of:
                 index_of[key] = len(activities)
                 activities.append(label)
             for vi in marks:
-                cells.add((index_of[key], offset + vi))
+                cells.add((index_of[key], where[vi]))
     if not visits or not activities:
         return None
     return SoAGrid(method="geometry", epochs=epochs, visits=visits, timings=timings,
