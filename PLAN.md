@@ -91,8 +91,8 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 ### CP-C · Sonnet / medium · Yardstick (M1)
 | ID | Task | Done when |
 |---|---|---|
-| Q-1 | Freeze the train / held-out split in config; benchmark refuses to tune on held-out | split is code, not a note |
-| Q-2 | Run invariants over all 204 protocol versions and record the baseline | table in `docs/scoreboard.md` |
+| Q-1 | ~~Freeze the train / held-out split~~ **done** (`eval/split.py`) | split is code, not a note |
+| Q-2 | ~~Run invariants over all 204 protocol versions~~ **done**: no crashes; weakest are SoA visit-name uniqueness (61%) and visits with a mark (62%) | table in `docs/scoreboard.md` |
 | Q-3 | One benchmark run with `--llm` on the 8 studies (est. $5–15, D3 approved) | accuracy by category, LLM vs deterministic |
 | Q-4 | **Audited gold**: a clinical data manager corrects our output in the review UI for train and held-out studies (about a day per study; human task, D1) | gold labels committed under `data/labels/` |
 
