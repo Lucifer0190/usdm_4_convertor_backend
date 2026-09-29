@@ -51,3 +51,25 @@ Generated 2026-09-29T06:37:53+00:00. `usdm4` and rule-set pins: see `PINS.md`.
 | `DDF00153` | 6 |
 | `DDF00012` | 1 |
 | `DDF00040` | 1 |
+
+## Structural invariants over all 204 protocol versions (2026-09-29, no labels)
+
+Baseline for generalisation (PLAN.md task Q-2). No crashes. Full table and the failing-file list are in
+`spikes/reports/invariants_all_versions.md`; reproduce with `spikes/run_invariants.py --all-versions`.
+
+| Area | Invariant | Holds |
+|---|---|---:|
+| Sections | every slot found (7 of 7) | 100% |
+| SoA | grid found | 99% |
+| SoA | marks in range / activity names label-sized | 99% / 98% |
+| SoA | most activities are scheduled | 95% |
+| SoA | every visit has a mark | **62%** |
+| SoA | visit names unique enough | **61%** |
+| Eligibility | inclusion / exclusion lists present | 91% / 93% |
+| Eligibility | items are criterion-sized | 87% |
+| Objectives | table found | 99% |
+| Objectives | every row has an endpoint | 88% |
+
+The two weak spots are both SoA: duplicate visit names and visit columns with no mark. They are the
+large oncology schedules with cycle-based headers (C4891xxx, C2321xxx, C1071xxx), so they are the first
+target of PLAN.md task C-1.
