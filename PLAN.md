@@ -73,9 +73,9 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 ### CP-A · Sonnet / low · Housekeeping (M0)
 | ID | Task | Done when |
 |---|---|---|
-| H-1 | Fix the 5 ruff errors listed in STATE.md | `ruff check src tests` clean |
-| H-2 | Add `.gitattributes` (stop LF/CRLF churn) | no whole-file diffs on Windows |
-| H-3 | Point remaining references (README, DESIGN.md, docs) at this plan or the archive | no link to a missing `DEVPLAN.md` |
+| H-1 | ~~Fix ruff errors~~ **done** (`ruff check` clean, 557 tests pass). Deferred by decision: the 400-line guard fails on `pipeline.py` and `extract/soa/geometry.py`; we run tests locally and do not rely on GitHub CI for now | ruff clean; split the two files when CI is switched on |
+| H-2 | ~~Add `.gitattributes`~~ **done** | no whole-file diffs on Windows |
+| H-3 | ~~Point references at this plan or the archive~~ **done** | no link to a missing `DEVPLAN.md` |
 | H-4 | Push `dev` to the backend repo (`origin` now points to `usdm_4_convertor_backend`; the old repo is remote `legacy`) | `dev` visible on GitHub |
 
 ### CP-B · Sonnet / medium · Backend hardening (M5)
