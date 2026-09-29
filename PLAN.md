@@ -21,6 +21,10 @@ Two parts, one repo:
 The backend never contains extraction logic. It only calls the `Converter` interface, so the brain can change
 freely.
 
+**Principles (decided):** the real API is **LLM-only** (no key, no conversion: it answers 503); rule-based readers
+stay inside the pipeline only as an independent cross-check on the LLM. Backend repo:
+`github.com/Lucifer0190/usdm_4_convertor_backend` (remote `origin`; the old repo is remote `legacy`).
+
 ## 2. What "89%" means (fixed, so it can be checked)
 
 - Accuracy = matched items / (reference items + spurious delivered items). A wrong or invented item costs as
@@ -41,7 +45,7 @@ freely.
 | Development study C5091017 | 77.8% |
 | The other seven studies | 16–36% |
 | LLM readers measured on the 8 studies | **not yet** |
-| Backend API | works, LLM on by default, live-tested on one protocol |
+| Backend API | works, LLM-only, 10 tests pass, live-tested on one protocol (38 s) |
 | d4k rules on real studies | 0 of 23 pass (rules triage pending) |
 
 The Schedule of Activities (SoA) is 60% of the score, so it decides whether we reach 89%.
@@ -50,7 +54,7 @@ The Schedule of Activities (SoA) is 60% of the score, so it decides whether we r
 
 | Milestone | Done when |
 |---|---|
-| **M0 Clean house** | One plan (this file), CI green, `dev` pushed |
+| **M0 Clean house** | One plan (this file, done), CI green, `dev` pushed to the backend repo |
 | **M1 Trustworthy yardstick** | Audited gold exists for train and held-out sets; benchmark reports both |
 | **M2 SoA general** | Held-out SoA items ≥ 85% |
 | **M3 Whole study** | Held-out overall ≥ 75% pre-review, all categories extracted |
@@ -126,7 +130,7 @@ in whenever the backend is needed by the frontend team.
 |---|---|---|
 | D1 | Who audits the gold (clinical data manager)? | Q-4, M1 and everything measured after it |
 | D2 | Is 89% before or after human review? | M4 wording |
-| D3 | **Decided:** the real API is LLM-only (no deterministic-only mode); LLM benchmark runs are approved. Still open: a monthly spend cap | - |
+| D3 | **Decided:** the real API is LLM-only; LLM benchmark runs are approved. **Open:** a monthly spend cap (proposal: alert at $50, stop at $100) | Q-3, C-2, C-3 cost control |
 | D4 | Approve the train and held-out split in section 2 | Q-1 |
 | D5 | **Decided:** backend repo is `github.com/Lucifer0190/usdm_4_convertor_backend` | - |
 
