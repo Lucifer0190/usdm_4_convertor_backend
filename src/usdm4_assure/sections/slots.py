@@ -49,16 +49,21 @@ class Slot:
     """
     name: str
     patterns: tuple[str, ...]
-    # Keep only matches within this many pages of the first match. A protocol's amendment
-    # history repeats the *historic* schedules (Tables 16-18 on pages 184-211 of a 200-page
-    # protocol) and those must not be read as the current one.
+    # Matches of every pattern are grouped into clusters: sections within this many pages of
+    # the previous match belong to one cluster. The first cluster is "the" slot; the others
+    # are further parts (a sub-study's schedule in an appendix).
     cluster_pages: int | None = None
+    # A match under a top-level section whose title matches this is ignored. A protocol's
+    # amendment history repeats the *historic* schedules (Tables 16-18 on pages 184-211 of a
+    # 200-page protocol) and those must not be read as the current one.
+    exclude_under: str | None = None
 
 
 SLOTS: dict[str, Slot] = {s.name: s for s in (
     Slot("synopsis", (r"^(protocol )?synopsis$", r"^protocol summary$")),
-    Slot("soa", (r"schedule of (activities|assessments|events)", r"^flow ?chart$",
-                 r"time and events", r"study flow ?chart"), cluster_pages=15),
+    Slot("soa", (r"schedule of (activities|assessments?|events?)", r"^flow ?chart$",
+                 r"time and events", r"study flow ?chart", r"\bsoa\b"),
+         cluster_pages=15, exclude_under=r"amendment|revision history|summary of changes"),
     Slot("objectives", (r"^objectives?,? (endpoints?,? )?(and )?(estimands?|endpoints?)",
                         r"^objectives?,? estimands?,? (and )?endpoints?",
                         r"^study objectives?$", r"^objectives?$")),
@@ -69,6 +74,9 @@ SLOTS: dict[str, Slot] = {s.name: s for s in (
     Slot("interventions", (r"^study interventions?(\(s\))? administered$",
                            r"^study treatments?( administered)?$", r"^study interventions?(\(s\))?$")),
 )}
+
+
+_CAPTION = re.compile(r"^(table|figure)\s*[\w.-]*\d", re.IGNORECASE)
 
 
 def _norm_title(title: str) -> str:
@@ -84,32 +92,72 @@ def _pos(s: Section) -> tuple[int, float]:
 def _end_of(graph: SectionGraph, section: Section) -> tuple[int, float]:
     """Where ``section`` stops: the next section at the same or a higher level."""
     seen = False
+    own_caption = bool(_CAPTION.match(_norm_title(section.title)))
     for other in graph.sections:
         if other is section:
             seen = True
             continue
-        if seen and other.level <= section.level and _pos(other) > _pos(section):
-            return _pos(other)
+        if not seen or other.level > section.level or _pos(other) <= _pos(section):
+            continue
+        if not own_caption and _CAPTION.match(_norm_title(other.title)):
+            continue      # "Table 1. ..." is the section's own content, not the next section
+        return _pos(other)
     return _INF
 
 
-def find_sections(graph: SectionGraph, slot: str) -> list[Section]:
-    """The outermost sections that are ``slot``, in reading order."""
+def _top_level_parent(graph: SectionGraph, section: Section) -> Section | None:
+    parent = None
+    for other in graph.sections:
+        if other is section:
+            break
+        if other.level == 1:
+            parent = other
+    return parent
+
+
+def _outermost(graph: SectionGraph, matched: list[Section]) -> list[Section]:
+    chosen: list[Section] = []
+    for s in matched:
+        if any(_pos(c) <= _pos(s) < _end_of(graph, c) for c in chosen):
+            continue                     # nested inside a section already chosen
+        chosen.append(s)
+    return chosen
+
+
+def find_clusters(graph: SectionGraph, slot: str) -> list[list[Section]]:
+    """The slot's sections, grouped into clusters in reading order.
+
+    Slots without ``cluster_pages`` have one cluster: the matches of the first pattern
+    that matches anything. Clustered slots (the schedule of activities) union all their
+    patterns, drop matches under an excluded top-level section, and start a new cluster
+    when the next match is more than ``cluster_pages`` pages away.
+    """
     spec = SLOTS[slot]
-    for pattern in spec.patterns:
-        matched = [s for s in graph.sections if re.search(pattern, _norm_title(s.title))]
-        if not matched:
-            continue
-        chosen: list[Section] = []
-        for s in matched:
-            if any(_pos(c) <= _pos(s) < _end_of(graph, c) for c in chosen):
-                continue          # nested inside a section already chosen
-            if spec.cluster_pages is not None and chosen and \
-                    s.page - chosen[0].page > spec.cluster_pages:
-                continue          # a historic copy far from the main one
-            chosen.append(s)
-        return chosen
-    return []
+    if spec.cluster_pages is None:
+        for pattern in spec.patterns:
+            matched = [s for s in graph.sections if re.search(pattern, _norm_title(s.title))]
+            if matched:
+                return [_outermost(graph, matched)]
+        return []
+    matched = [s for s in graph.sections
+               if any(re.search(p, _norm_title(s.title)) for p in spec.patterns)]
+    if spec.exclude_under:
+        matched = [s for s in matched
+                   if not ((parent := _top_level_parent(graph, s)) is not None
+                           and re.search(spec.exclude_under, parent.title, re.IGNORECASE))]
+    clusters: list[list[Section]] = []
+    for s in _outermost(graph, matched):
+        if clusters and s.page - clusters[-1][-1].page <= spec.cluster_pages:
+            clusters[-1].append(s)
+        else:
+            clusters.append([s])
+    return clusters
+
+
+def find_sections(graph: SectionGraph, slot: str) -> list[Section]:
+    """The outermost sections that are ``slot`` (its first cluster), in reading order."""
+    clusters = find_clusters(graph, slot)
+    return clusters[0] if clusters else []
 
 
 def _in_span(b: Block, start: tuple[int, float], end: tuple[int, float]) -> bool:
@@ -173,6 +221,21 @@ def slot_document(doc: Document, graph: SectionGraph, *slots: str,
                       full_text="\n".join(b.text for b in kept),
                       page_images=doc.page_images, chars=doc.chars)
     return SlotWindow(tuple(slots), scoped, sections, pages)
+
+
+def slot_windows(doc: Document, graph: SectionGraph, slot: str,
+                 front_pages: int = 0) -> list[SlotWindow]:
+    """One :class:`SlotWindow` per cluster of the slot (see :func:`find_clusters`)."""
+    out: list[SlotWindow] = []
+    for cluster in find_clusters(graph, slot):
+        spans = [(_pos(s), _end_of(graph, s)) for s in cluster]
+        in_slot = [b for b in doc.blocks if any(_in_span(b, a, z) for a, z in spans)]
+        kept = [b for b in doc.blocks if b.page <= front_pages or b in in_slot]
+        scoped = Document(source=doc.source, blocks=kept,
+                          full_text="\n".join(b.text for b in kept),
+                          page_images=doc.page_images, chars=doc.chars)
+        out.append(SlotWindow((slot,), scoped, cluster, sorted({b.page for b in in_slot})))
+    return out
 
 
 # --- page furniture ---------------------------------------------------------------- #

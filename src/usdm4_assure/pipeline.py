@@ -41,7 +41,7 @@ from usdm4_assure.extract.windows import window_for
 from usdm4_assure.ingest.pdf import ingest
 from usdm4_assure.llm.router import get_llm, get_role_llm
 from usdm4_assure.sections.plan import build_plan
-from usdm4_assure.sections.slots import slot_document, strip_furniture
+from usdm4_assure.sections.slots import slot_document, slot_windows, strip_furniture
 from usdm4_assure.validate.gate import validate_wrapper
 from usdm4_assure.validate.repair import repair_loop
 
@@ -143,7 +143,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     """
     from usdm4_assure.assemble.study import build_full_study
     from usdm4_assure.extract.soa.crossval import cross_validate
-    from usdm4_assure.extract.soa.geometry import read_soa_geometry
+    from usdm4_assure.extract.soa.geometry import read_first_schedule
     from usdm4_assure.extract.soa.methods import (
         extract_pdfplumber,
         extract_pymupdf,
@@ -163,7 +163,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     # Section-level evidence (sections/slots.py): each domain reads its own section,
     # not the whole protocol, with running headers/footers removed. A slot that is
     # not found falls back to the routed window and says so.
-    inputs, soa_pages, slot_findings = _domain_inputs(pdf_path, win, routed)
+    inputs, soa_groups, slot_findings = _domain_inputs(pdf_path, win, routed)
     findings += slot_findings
     llm_primary, llm_alt = get_role_llm("extract"), get_role_llm("extract_alt")
 
@@ -201,10 +201,17 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     # The geometry reader (extract/soa/geometry.py) reads the ruling lines directly and is
     # the primary method; the table finders below are the fallback when a PDF draws no
     # rules (a scan or a text-aligned table).
-    geometry_grid = read_soa_geometry(pdf_path, soa_pages)
+    geometry_grid, used = read_first_schedule(pdf_path, soa_groups)
     if geometry_grid is not None:
         grid = cross_validate([geometry_grid])
+        if len(soa_groups) > 1:
+            findings.append(Finding(
+                FindingKind.SCOPE, Severity.INFO, "soa",
+                f"{len(soa_groups)} schedule sections were found (pages {soa_groups}); the "
+                f"first that holds a table (#{used + 1}) was read. Further sub-study "
+                "schedules are not yet assembled as separate timelines."))
     else:
+        soa_pages = soa_groups[0] if soa_groups else None
         pymupdf_grid = (extract_pymupdf_stitched(pdf_path, soa_pages)
                         or extract_pymupdf(pdf_path, soa_pages))
         grid = cross_validate([extract_pdfplumber(pdf_path, soa_pages), pymupdf_grid])
@@ -392,13 +399,14 @@ def _domain_inputs(pdf_path: Path, win: dict, routed) -> tuple[dict, list | None
                         if (inc_w or exc_w) else None),
         "objectives": (obj_w.document if obj_w else clean["objectives"], {"rows": rows}),
     }
-    soa_w = slot_document(clean["design"], graph, "soa") if have_graph else None
-    if have_graph and soa_w is None:
+    soa_groups = ([w.pages for w in slot_windows(clean["design"], graph, "soa")]
+                  if have_graph else [])
+    if have_graph and not soa_groups:
         findings.append(Finding(
             FindingKind.SCOPE, Severity.WARNING, "soa",
             "No schedule-of-activities section found in the outline; the table finder "
             "will search the whole document."))
-    return inputs, (soa_w.pages if soa_w else None), findings
+    return inputs, soa_groups, findings
 
 
 def _members(use_slm: bool) -> list:

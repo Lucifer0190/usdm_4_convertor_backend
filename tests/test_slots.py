@@ -143,3 +143,33 @@ def test_the_soa_slot_ignores_historic_schedules_far_from_the_main_one():
     doc = _doc((3, 120.0, "main soa"), (184, 20.0, "old soa"), (195, 20.0, "older soa"))
     win = slot_document(doc, graph, "soa")
     assert [b.text for b in win.document.blocks] == ["main soa"]
+
+
+def test_schedules_in_appendices_are_found_when_the_main_section_only_refers_to_them():
+    from usdm4_assure.sections.slots import slot_windows
+    graph = _graph(("1.3. Schedule of Activities", 2, 24, 100.0),
+                   ("2. Introduction", 1, 30, 10.0),
+                   ("10. Supporting Documentation", 1, 90, 10.0),
+                   ("10.7.2. SoA - Efficacy Study", 3, 91, 10.0),
+                   ("10.7.3. Something else", 3, 95, 10.0),
+                   ("10.8.2. SoA for Substudy A", 3, 133, 10.0),
+                   ("10.8.3. Other", 3, 140, 10.0),
+                   ("Appendix 14: Protocol Amendment History", 1, 200, 10.0),
+                   ("Table 16. Schedule of Activities: Study Lead-in", 2, 210, 10.0))
+    doc = _doc((24, 120.0, "intro only"), (91, 20.0, "efficacy soa"), (133, 20.0, "substudy soa"),
+               (210, 20.0, "historic"))
+    wins = slot_windows(doc, graph, "soa")
+    assert [[b.text for b in w.document.blocks] for w in wins] == [
+        ["intro only"], ["efficacy soa"], ["substudy soa"]]      # historic table under the amendment appendix excluded
+    assert [w.pages for w in wins] == [[24], [91], [133]]
+
+
+def test_a_table_caption_bookmark_does_not_end_the_section_it_belongs_to():
+    graph = _graph(("1.3. Schedule of Activities", 2, 21, 100.0),
+                   ("Table 1. Study Schedule of Assessment", 2, 21, 300.0),   # singular, same level
+                   ("2. Introduction", 1, 29, 10.0))
+    doc = _doc((21, 120.0, "intro"), (21, 320.0, "table starts"), (25, 50.0, "table continues"),
+               (29, 40.0, "introduction text"))
+    win = slot_document(doc, graph, "soa")
+    assert [b.text for b in win.document.blocks] == ["intro", "table starts", "table continues"]
+    assert win.pages == [21, 25]

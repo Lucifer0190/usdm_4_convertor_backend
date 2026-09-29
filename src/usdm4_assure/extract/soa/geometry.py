@@ -46,6 +46,9 @@ _EPOCH_NAMES = (
     (re.compile(r"^(f/?u|follow)", re.I), "Follow-up Period"),
 )
 _UNIT_HINT = re.compile(r"(?<![a-z])(day|week|month|cycle)s?(?![a-z])\s*(\([^)]*\))?", re.IGNORECASE)
+_ROW_UNIT = re.compile(r"^(study\s+)?(week|day|month)s?\b", re.IGNORECASE)
+_CYCLE = re.compile(r"^(cycle|c)\s*\d+\b", re.IGNORECASE)
+_NARROW = 45.0                # points: a cell this narrow wraps words mid-word
 _EXTENDS_PREVIOUS = re.compile(r"^(et|early term\w*|unscheduled|eot|end of treatment)\b", re.I)
 
 
@@ -175,7 +178,17 @@ def _table_box(vs: list[_Seg], hs: list[_Seg]) -> tuple[float, float, float, flo
         area = (x1 - x0) * (y1 - y0)
         if area > best_area:
             best, best_area = (x0, y0, x1, y1), area
-    return best
+    if best is None:
+        return None
+    # The rules of one table are not always drawn touching (a shaded header can sit a hair
+    # away from the body), so the connected set may be only the header. Grow the box to
+    # every rule that lies inside its horizontal extent: a page has one schedule table.
+    # Only the vertical rules set the extent: a lone horizontal rule (the line under the
+    # running header) lies above the table and must not pull its heading text in.
+    bx0, by0, bx1, by1 = best
+    inside_v = [s for s in vs if bx0 - 2 <= s.pos <= bx1 + 2]
+    ys = [s.lo for s in inside_v] + [s.hi for s in inside_v]
+    return (bx0, min([by0] + ys), bx1, max([by1] + ys))
 
 
 def _grid(vs: list[_Seg], hs: list[_Seg], box) -> tuple[list[float], list[float], list[_Seg]]:
@@ -235,15 +248,37 @@ def _cell_lines(lines: Iterable[_Line], x0: float, x1: float, y0: float, y1: flo
     return [ln for ln in lines if x0 <= ln.cx <= x1 and y0 <= ln.cy <= y1]
 
 
-def _visual_lines(tokens: list[_Line]) -> list[str]:
-    """Horizontal tokens -> lines of text (top to bottom, left to right)."""
+_FUNCTION_WORDS = re.compile(r"^(and|or|to|of|day|days|the|in|on|at|for|per|by|with)\b", re.I)
+
+
+def _merge_wrapped(parts: list[str]) -> list[str]:
+    """Rejoin a word that a narrow cell wrapped mid-word ("Screen" / "ing").
+
+    A line that ends in a letter followed by a short lower-case fragment that is not a
+    function word is the tail of the previous word, not a new one.
+    """
+    out: list[str] = []
+    for p in parts:
+        if (out and re.search(r"[A-Za-z]$", out[-1]) and re.match(r"^[a-z]{1,5}(?:\W|$)", p)
+                and not _FUNCTION_WORDS.match(p)):
+            out[-1] += p
+        else:
+            out.append(p)
+    return out
+
+
+def _visual_lines(tokens: list[_Line], narrow: bool = False) -> list[str]:
+    """Horizontal tokens -> lines of text (top to bottom, left to right).
+
+    ``narrow`` cells wrap mid-word, so their line breaks are repaired."""
     rows: list[list[_Line]] = []
     for tok in sorted((t for t in tokens if not t.rotated), key=lambda t: t.cy):
         if rows and abs(rows[-1][0].cy - tok.cy) <= 0.6 * max(tok.bbox[3] - tok.bbox[1], 4.0):
             rows[-1].append(tok)
         else:
             rows.append([tok])
-    return [" ".join(t.text for t in sorted(r, key=lambda t: t.cx)) for r in rows]
+    lines = [" ".join(t.text for t in sorted(r, key=lambda t: t.cx)) for r in rows]
+    return _merge_wrapped(lines) if narrow else lines
 
 
 def _rotated_lines(tokens: list[_Line]) -> list[str]:
@@ -263,9 +298,9 @@ def _rotated_lines(tokens: list[_Line]) -> list[str]:
     return [" ".join(t.text for t in sorted(col, key=lambda t: t.cy, reverse=up)) for col in columns]
 
 
-def _join(lines: list[_Line]) -> str:
+def _join(lines: list[_Line], narrow: bool = False) -> str:
     """Cell text: horizontal lines top to bottom, then rotated lines in stacking order."""
-    parts = _visual_lines(lines) + _rotated_lines(lines)
+    parts = _visual_lines(lines, narrow) + _rotated_lines(lines)
     return re.sub(r"\s+", " ", " ".join(parts)).strip()
 
 
@@ -368,13 +403,17 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
     first.body_start = _body_start(first, notes_col)
     visit_cols = list(range(1, notes_col))
 
-    # ---- header bands -> epochs, visit labels and unit hints
+    # ---- header bands -> epochs, visit labels, prefixes and unit hints
     epoch_by_col: dict[int, str] = {}
     unit_by_col: dict[int, tuple[str, str]] = {}
     label_parts: dict[int, list[str]] = {c: [] for c in visit_cols}
+    prefix_parts: dict[int, list[str]] = {c: [] for c in visit_cols}
+    window_parts: dict[int, list[str]] = {c: [] for c in visit_cols}
     for r in range(first.body_start):
         y0, y1 = first.row_edges[r], first.row_edges[r + 1]
         edges = _edges_in_band(first, y0, y1)
+        row_label = _join(_cell_lines(first.lines, first.col_edges[0], first.col_edges[1], y0, y1))
+        row_unit = _ROW_UNIT.match(row_label)
         for i in range(len(edges) - 1):
             ex0, ex1 = edges[i], edges[i + 1]
             covered = [c for c in visit_cols
@@ -382,21 +421,31 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
             if not covered:
                 continue
             cell = _cell_lines(first.lines, ex0, ex1, y0, y1)
-            text = _join(cell)
+            text = _join(cell, narrow=(ex1 - ex0) < _NARROW)
             if not text:
                 continue
             unit = _UNIT_HINT.search(text)
             if unit:
                 for c in covered:
                     unit_by_col.setdefault(c, (unit.group(1).capitalize(), (unit.group(2) or "").strip()))
+            if len(covered) > 1:
+                if _WINDOW.match(text):                    # one window cell over several visits
+                    for c in covered:
+                        window_parts[c].append(text)
+                elif _CYCLE.match(text):                   # "Cycle 1" over its Day 1 / Day 8 columns
+                    for c in covered:
+                        prefix_parts[c].append(text)
             if r == 0:
                 for c in covered:
                     epoch_by_col.setdefault(c, _norm_epoch(text))
                 if len(covered) == 1:
                     label_parts[covered[0]].append("\x00" + text)
             elif len(covered) == 1:
+                narrow = (ex1 - ex0) < _NARROW
                 rotated = " ".join(_rotated_lines(cell))
-                horizontal = " ".join(_visual_lines(cell))
+                horizontal = " ".join(_visual_lines(cell, narrow))
+                if row_unit and re.fullmatch(r"\d+\+?", horizontal):
+                    horizontal = f"{row_unit.group(2).capitalize()} {horizontal}"   # bare "5" -> "Week 5"
                 label_parts[covered[0]] += [p for p in (rotated, horizontal) if p]
     visits, timings, epochs = [], [], []
     last_epoch = ""
@@ -407,6 +456,10 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
         name, window = _split_label(primary or fallback)
         if not name:
             name, _ = _split_label(fallback)
+        window = window or " ".join(window_parts[c])
+        prefix = " ".join(p for p in prefix_parts[c] if p not in (name or ""))
+        if prefix and name:
+            name = f"{prefix} {name}"
         if re.fullmatch(r"\d+(?:\.\d+)?", name or "") and c in unit_by_col:
             unit_name, unit_window = unit_by_col[c]        # "8" under "Week (+/- 7 days)" -> "Week 8"
             name = f"{unit_name} {name}"
@@ -439,11 +492,22 @@ def _parse_table_pages(tables: list[_Table]) -> _Parsed:
                 continue                                    # empty header remnant
             marks: dict[int, str] = {}
             if not _row_is_group(t, r):
-                for vi, c in enumerate(visit_cols):
-                    cell = _cell_lines(t.lines, t.col_edges[c], t.col_edges[c + 1], y0, y1)
-                    hit = next((ln.text for ln in cell if not ln.rotated and _MARK.match(ln.text)), None)
+                edges = _edges_in_band(t, y0, y1)
+                for i in range(len(edges) - 1):
+                    ex0, ex1 = edges[i], edges[i + 1]
+                    covered = [vi for vi, c in enumerate(visit_cols)
+                               if t.col_edges[c] >= ex0 - _TOL and t.col_edges[c + 1] <= ex1 + _TOL]
+                    if not covered:
+                        continue
+                    cell = [ln for ln in _cell_lines(t.lines, ex0, ex1, y0, y1) if not ln.rotated]
+                    hit = next((ln.text for ln in cell if _MARK.match(ln.text)), None)
+                    if hit is None and len(covered) > 1:
+                        joined = " ".join(_visual_lines(cell))
+                        if 3 <= len(joined) <= 60 and not joined.isdigit():
+                            hit = joined          # "as per standard of care" over several visits
                     if hit:
-                        marks[vi] = hit
+                        for vi in covered:
+                            marks[vi] = hit
             if label or marks:
                 rows.append((label, marks))
     return _Parsed(visits, timings, epochs, rows)
@@ -508,3 +572,21 @@ def read_soa_geometry(pdf_path: str | Path, pages: list[int] | None = None) -> S
         return None
     return SoAGrid(method="geometry", epochs=epochs, visits=visits, timings=timings,
                    activities=activities, cells=cells)
+
+
+def read_first_schedule(pdf_path: str | Path,
+                        page_groups: list[list[int]]) -> tuple[SoAGrid | None, int]:
+    """Read the first page group that holds a usable schedule.
+
+    A protocol's "1.3 Schedule of Activities" may only refer the reader to schedules in
+    appendices (one per sub-study). Groups are tried in reading order; the first one that
+    yields a grid with visits and activities wins.
+
+    Returns:
+        ``(grid, index of the group used)``; ``(None, -1)`` when none of them holds one.
+    """
+    for i, pages in enumerate(page_groups):
+        grid = read_soa_geometry(pdf_path, pages)
+        if grid is not None and len(grid.visits) >= 2 and len(grid.activities) >= 3:
+            return grid, i
+    return None, -1

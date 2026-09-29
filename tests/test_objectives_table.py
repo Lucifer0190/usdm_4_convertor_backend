@@ -116,3 +116,63 @@ def test_assembler_block_lists_every_endpoint_of_a_row():
     legacy = _objectives_block(ObjectivesExtract(items=[
         ObjectivePair("Assess efficacy.", "PASI 75.", "Primary")]))
     assert [e["text"] for e in legacy["objectives"][0]["endpoints"]] == ["PASI 75."]
+
+
+# --- the same logical table drawn with different raw column grids ------------------------ #
+def _pdf_grid(path, pages, widths):
+    """Like ``_pdf`` but with arbitrary column widths (empty spacer columns, as in real files)."""
+    doc = pymupdf.open()
+    for rows in pages:
+        page = doc.new_page()
+        y = 60.0
+        for row in rows:
+            x = 40.0
+            for text, w in zip(row, widths, strict=True):
+                rect = pymupdf.Rect(x, y, x + w, y + 40)
+                page.draw_rect(rect, color=(0, 0, 0), width=0.8)
+                page.insert_textbox(rect + (2, 2, -2, -2), text, fontname="helv", fontsize=7)
+                x += w
+            y += 40
+    doc.save(str(path))
+    return path
+
+
+def test_five_raw_columns_with_spacers_and_a_tier_in_the_middle_column(tmp_path):
+    W = [150, 30, 150, 120, 20]
+    page1 = [["Study Lead-in", "", "", "", ""],
+             ["Objectives", "", "Endpoints", "Estimands", ""],
+             ["", "Primary", "", "", ""],
+             [B + "To determine the dose.", "", B + "Incidence of neutropenia.", B + "See Section 9.", ""],
+             ["", "Secondary", "", "", ""],
+             [B + "To evaluate safety.", "", B + "Incidence of AEs. " + B + "Incidence of SAEs.", B + "Not Applicable", ""]]
+    page2 = [["Phase 3", "", "", "", ""], ["Objectives", "", "Endpoints", "Estimands", ""],
+             ["", "Primary", "", "", ""],
+             [B + "To show superiority.", "", B + "Progression-free survival.", B + "See Section 9.2.", ""]]
+    rows = read_objectives_table(_pdf_grid(tmp_path / "g.pdf", [page1, page2], W), pages=[1, 2])
+    assert [(r.part, r.level) for r in rows] == [("Study Lead-in", "Primary"), ("Study Lead-in", "Secondary"),
+                                                  ("Phase 3", "Primary")]
+    assert rows[0].objective == "To determine the dose."
+    assert rows[0].endpoints == ["Incidence of neutropenia."]
+    assert rows[1].endpoints == ["Incidence of AEs.", "Incidence of SAEs."] and rows[1].estimand is None
+    assert rows[0].estimand == "See Section 9."
+
+
+def test_two_column_tables_have_no_estimands(tmp_path):
+    W = [220, 220]
+    page = [["Objectives", "Endpoints*"], ["Primary:", "Primary:"],
+            [B + "To evaluate long-term safety.", B + "Incidence of TEAEs."],
+            ["Tertiary (Exploratory):", "Tertiary (Exploratory):"],
+            [B + "To evaluate the effect on hair.", B + "Response at Week 12."]]
+    rows = read_objectives_table(_pdf_grid(tmp_path / "g.pdf", [page], W), pages=[1])
+    assert [r.level for r in rows] == ["Primary", "Exploratory"]
+    assert rows[0].endpoints == ["Incidence of TEAEs."] and rows[0].estimand is None
+
+
+def test_tier_labels_with_objective_words_and_key_secondary(tmp_path):
+    W = [220, 220]
+    page = [["Objectives", "Endpoints"], ["Primary Objective(s):", "Primary Endpoint(s):"],
+            [B + "To compare A with B.", B + "PFS by BICR."],
+            ["Key Secondary Objectives", "Key Secondary Endpoints"],
+            [B + "To compare OS.", B + "Overall survival."]]
+    rows = read_objectives_table(_pdf_grid(tmp_path / "g.pdf", [page], W), pages=[1])
+    assert [r.level for r in rows] == ["Primary", "Secondary"]
