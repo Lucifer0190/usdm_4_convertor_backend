@@ -143,6 +143,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     """
     from usdm4_assure.assemble.study import build_full_study
     from usdm4_assure.extract.soa.crossval import cross_validate
+    from usdm4_assure.extract.soa.geometry import read_soa_geometry
     from usdm4_assure.extract.soa.methods import (
         extract_pdfplumber,
         extract_pymupdf,
@@ -197,9 +198,16 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     # ``soa_pages`` is the schedule-of-activities section's page range (None when the
     # outline has no such section): without it "the table with most activities" was
     # an abbreviation glossary.
-    pymupdf_grid = (extract_pymupdf_stitched(pdf_path, soa_pages)
-                    or extract_pymupdf(pdf_path, soa_pages))
-    grid = cross_validate([extract_pdfplumber(pdf_path, soa_pages), pymupdf_grid])
+    # The geometry reader (extract/soa/geometry.py) reads the ruling lines directly and is
+    # the primary method; the table finders below are the fallback when a PDF draws no
+    # rules (a scan or a text-aligned table).
+    geometry_grid = read_soa_geometry(pdf_path, soa_pages)
+    if geometry_grid is not None:
+        grid = cross_validate([geometry_grid])
+    else:
+        pymupdf_grid = (extract_pymupdf_stitched(pdf_path, soa_pages)
+                        or extract_pymupdf(pdf_path, soa_pages))
+        grid = cross_validate([extract_pdfplumber(pdf_path, soa_pages), pymupdf_grid])
 
     amendment_diff, amendments_data = None, None
     if previous_version is not None:
