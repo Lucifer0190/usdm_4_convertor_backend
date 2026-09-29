@@ -246,6 +246,33 @@ class StudyScore:
         return self.matched / self.reference if self.reference else 1.0
 
 
+SOA_CATEGORIES = ("epochs", "encounters", "activities", "marks")
+
+
+def score_grid(grid, reference: dict) -> StudyScore:
+    """Score a bare Schedule of Activities grid on the SoA categories only.
+
+    Used to compare SoA readers on the same pages without running the whole pipeline.
+    """
+    ref = view_of(reference)
+    got = {
+        "epochs": list(dict.fromkeys(e for e in grid.epochs if e)),
+        "encounters": list(grid.visits),
+        "activities": list(grid.activities),
+        "marks": [(grid.visits[v], grid.activities[a]) for a, v in sorted(grid.cells)],
+    }
+    out = StudyScore()
+    for name in SOA_CATEGORIES:
+        if not ref[name]:
+            continue
+        similar = ((lambda a, b: min(_jaccard(a[0], b[0]), _jaccard(a[1], b[1])))
+                   if name == "marks" else _jaccard)
+        threshold = 0.6 if name == "marks" else _THRESHOLDS[name]
+        out.categories[name] = Category(matched=_greedy(ref[name], got[name], similar, threshold),
+                                        reference=len(ref[name]), delivered=len(got[name]))
+    return out
+
+
 def score_study(delivered: dict, reference: dict) -> StudyScore:
     """Score one delivered USDM against one reference USDM (wrappers or bare studies)."""
     got, ref = view_of(delivered), view_of(reference)
