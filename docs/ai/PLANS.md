@@ -8,10 +8,10 @@ H-3 | Point README, DESIGN.md and docs at PLAN.md or the archive | Trello | PLAN
 Q-4 | Audited gold for train and held-out studies (needs owner, decision D1) | Trello | PLAN.md CP-C
 
 ## Next (max 7)
-H-4 | Confirm which repo is the backend and push dev | Trello | PLAN.md CP-A
+H-4 | Push dev to the backend repo (origin set) | Trello | PLAN.md CP-A
 Q-1 | Freeze the train / held-out split in config | Trello | PLAN.md CP-C
 Q-2 | Invariants over all 204 protocol versions | Trello | PLAN.md CP-C
-Q-3 | One benchmark run with --llm (needs approval D3) | Trello | PLAN.md CP-C
+Q-3 | One benchmark run with --llm (D3 approved) | Trello | PLAN.md CP-C
 C-1 | SoA layouts still failing | Trello | PLAN.md CP-D
 C-2 | AI vision SoA reader with geometry cross-check | Trello | PLAN.md CP-D
 B-2 | Async job API | Trello | PLAN.md CP-B

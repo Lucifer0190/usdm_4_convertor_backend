@@ -72,7 +72,7 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 | H-1 | Fix the 5 ruff errors listed in STATE.md | `ruff check src tests` clean |
 | H-2 | Add `.gitattributes` (stop LF/CRLF churn) | no whole-file diffs on Windows |
 | H-3 | Point remaining references (README, DESIGN.md, docs) at this plan or the archive | no link to a missing `DEVPLAN.md` |
-| H-4 | Confirm the backend repo: `origin` is `usdm_4_convertor`, Trello points to `usdm_4_convertor_backend` | one repo agreed (D5), `dev` pushed |
+| H-4 | Push `dev` to the backend repo (`origin` now points to `usdm_4_convertor_backend`; the old repo is remote `legacy`) | `dev` visible on GitHub |
 
 ### CP-B · Sonnet / medium · Backend hardening (M5)
 | ID | Task | Done when |
@@ -89,7 +89,7 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 |---|---|---|
 | Q-1 | Freeze the train / held-out split in config; benchmark refuses to tune on held-out | split is code, not a note |
 | Q-2 | Run invariants over all 204 protocol versions and record the baseline | table in `docs/scoreboard.md` |
-| Q-3 | One benchmark run with `--llm` on the 8 studies (est. $5–15, needs approval D3) | accuracy by category, LLM vs deterministic |
+| Q-3 | One benchmark run with `--llm` on the 8 studies (est. $5–15, D3 approved) | accuracy by category, LLM vs deterministic |
 | Q-4 | **Audited gold**: a clinical data manager corrects our output in the review UI for train and held-out studies (about a day per study; human task, D1) | gold labels committed under `data/labels/` |
 
 ### CP-D · Opus / high · SoA generality and AI reader (M2)
@@ -97,7 +97,7 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 |---|---|---|
 | C-1 | SoA layouts still failing: cycle-based headers, duplicate visit names, empty visit columns, tables without ruling lines, reduced or amended schedules, several tables, footnote conditions | ≥ 85% SoA on train; then measured on held-out |
 | C-2 | **AI SoA reader**: vision model (Gemini 3.1 Pro, cross-checked by Sonnet 5.5) reads the table page images; the geometry reader is the independent check; disagreements go to review | disagreement rate reported |
-| C-3 | **Bake-off** on the same pages: geometry vs vision LLM vs Granite-Docling vs Docling (needs D3) | one table, one winner per layout type |
+| C-3 | **Bake-off** on the same pages: geometry vs vision LLM vs Granite-Docling vs Docling (D3 approved) | one table, one winner per layout type |
 | C-4 | Sub-study schedules become separate timelines instead of one merged table | test on a two-schedule protocol |
 
 ### CP-E · Sonnet / medium · The rest of the study (M3)
@@ -126,9 +126,9 @@ in whenever the backend is needed by the frontend team.
 |---|---|---|
 | D1 | Who audits the gold (clinical data manager)? | Q-4, M1 and everything measured after it |
 | D2 | Is 89% before or after human review? | M4 wording |
-| D3 | LLM budget and how often runs may happen (data goes to OpenRouter) | Q-3, C-2, C-3 |
+| D3 | **Decided:** the real API is LLM-only (no deterministic-only mode); LLM benchmark runs are approved. Still open: a monthly spend cap | - |
 | D4 | Approve the train and held-out split in section 2 | Q-1 |
-| D5 | Which repo is the backend: `usdm_4_convertor` or `usdm_4_convertor_backend`? | H-4 |
+| D5 | **Decided:** backend repo is `github.com/Lucifer0190/usdm_4_convertor_backend` | - |
 
 ## 7. Rules that keep this the only plan
 

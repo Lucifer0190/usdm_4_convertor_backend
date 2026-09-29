@@ -44,7 +44,6 @@ curl -X POST "http://localhost:8080/v1/convert?include_report=true" -F "file=@pr
 | `USDM4_MAX_CONCURRENT` | 2 | conversions at once; others wait |
 | `USDM4_TIMEOUT_S` | 900 | per request |
 | `OPEN_ROUTER_KEY` | unset | **required**: the LLM pipeline is the default; without it the API answers 503 |
-| `USDM4_ALLOW_NO_LLM` | unset | set to `1` to allow deterministic-only conversion (offline / tests) |
 
 ## Things to know before deploying
 
