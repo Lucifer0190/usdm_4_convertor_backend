@@ -81,12 +81,12 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 ### CP-B · Sonnet / medium · Backend hardening (M5)
 | ID | Task | Done when |
 |---|---|---|
-| B-1 | Reject corrupt, encrypted and scanned PDFs with a clear 422 before the pipeline runs | test per case |
-| B-2 | Async jobs: `POST /v1/jobs` returns an id, `GET /v1/jobs/{id}` returns status and result | a 5-minute conversion no longer holds one HTTP request |
-| B-3 | `USDM4_RUN_CORE=1` runs the official CDISC CORE gate when `CDISC_LIBRARY_API_KEY` is set; result goes in the report, never blocks the response | report shows core status |
-| B-4 | Return `run_id` and quality summary as response headers; structured request logs | one log line per request with run id |
-| B-5 | Build and run the Docker image on Linux; document the deploy in `docs/api.md` | `docker compose --profile api up` converts the synthetic protocol |
-| B-6 | Persistent volumes for `data/audit` and the LLM cache; document backup | run survives a container restart |
+| B-1 | ~~Reject corrupt, encrypted and scanned PDFs~~ **done**: 422 with `reason` = `corrupt_pdf` / `encrypted_pdf` / `scanned_pdf_no_ocr` | test per case |
+| B-2 | ~~Async jobs~~ **done**: `POST /v1/jobs` -> 202 `{id}`, `GET /v1/jobs/{id}`; in-memory, TTL `USDM4_JOB_TTL_S` (lost on restart) | a 5-minute conversion no longer holds one HTTP request |
+| B-3 | ~~`USDM4_RUN_CORE=1`~~ **done**: runs the CORE gate, result in the report, never blocks; skipped without the key (**not yet exercised: no CDISC key**) | report shows core status |
+| B-4 | ~~run id and logs~~ **done**: `X-Run-Id` header, one structured log line per request/job | one log line per request with run id |
+| B-5 | Docker on Linux: compose passes every setting and `.dockerignore` added, docs written. **Unverified: no Docker daemon on the build machine** — run `docker compose --profile api up --build` and convert the synthetic protocol | `docker compose --profile api up` converts the synthetic protocol |
+| B-6 | ~~Persistent volumes~~ **done in compose and docs** (`./data:/app/data`, what to back up); restart survival not yet exercised with Docker | run survives a container restart |
 
 ### CP-C · Sonnet / medium · Yardstick (M1)
 | ID | Task | Done when |

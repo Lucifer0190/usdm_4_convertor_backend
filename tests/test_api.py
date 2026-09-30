@@ -127,3 +127,87 @@ def test_a_scanned_pdf_with_no_text_layer_is_refused_cleanly_not_a_500(monkeypat
                                                     "application/pdf")})
     assert r.status_code == 422
     assert r.json()["reason"] == "scanned_pdf_no_ocr"
+
+
+# --- async jobs, headers, input checks ---------------------------------------------------- #
+def _wait_done(client, jid, tries=50):
+    import time
+    for _ in range(tries):
+        body = client.get(f"/v1/jobs/{jid}").json()
+        if body["status"] in ("done", "failed"):
+            return body
+        time.sleep(0.05)
+    raise AssertionError("job did not finish")
+
+
+def test_a_job_is_accepted_at_once_and_polled_to_its_result():
+    with TestClient(create_app(FakeConverter())) as client:
+        r = client.post("/v1/jobs", files={"file": ("p.pdf", PDF, "application/pdf")})
+        assert r.status_code == 202 and r.json()["status"] == "queued"
+        body = _wait_done(client, r.json()["id"])
+        assert body["status"] == "done" and body["result"] == {"study": {"name": "S"}}
+
+
+def test_a_failed_job_reports_the_same_error_a_direct_call_would():
+    with TestClient(create_app(FakeConverter(fail=True))) as client:
+        jid = client.post("/v1/jobs", files={"file": ("p.pdf", PDF, "application/pdf")}).json()["id"]
+        body = _wait_done(client, jid)
+        assert body["status"] == "failed" and body["http_status"] == 422
+        assert body["error"]["assembler_errors"] == ["boom"]
+
+
+def test_jobs_are_validated_up_front_and_unknown_ids_are_404():
+    client = TestClient(create_app(FakeConverter()))
+    assert client.post("/v1/jobs", files={"file": ("p.pdf", b"hello", "application/pdf")}).status_code == 400
+    assert client.get("/v1/jobs/nope").status_code == 404
+
+
+def test_jobs_need_the_api_key_and_the_llm(monkeypatch):
+    monkeypatch.setenv("USDM4_API_KEYS", "k1")
+    client = TestClient(create_app(FakeConverter()))
+    assert client.post("/v1/jobs", files={"file": ("p.pdf", PDF, "application/pdf")}).status_code == 401
+    assert client.get("/v1/jobs/x").status_code == 401
+    monkeypatch.delenv("USDM4_API_KEYS")
+    down = TestClient(create_app(FakeConverter(llm=False)))
+    assert down.post("/v1/jobs", files={"file": ("p.pdf", PDF, "application/pdf")}).status_code == 503
+
+
+def test_the_run_id_is_a_response_header():
+    class WithRun(FakeConverter):
+        def convert(self, pdf_path, work_dir):
+            return ConversionResult({"study": {}}, {"run_id": "run-42", "findings": 1})
+
+    r = _post(TestClient(create_app(WithRun())))
+    assert r.headers["X-Run-Id"] == "run-42"
+
+
+def _pdf_file(tmp_path, name, build):
+    import pymupdf
+    doc = pymupdf.open()
+    build(doc)
+    path = tmp_path / name
+    build_kw = {}
+    if name.startswith("enc"):
+        build_kw = {"encryption": pymupdf.PDF_ENCRYPT_AES_256, "owner_pw": "o", "user_pw": "u"}
+    doc.save(str(path), **build_kw)
+    doc.close()
+    return path.read_bytes()
+
+
+def test_a_corrupt_pdf_and_an_encrypted_pdf_are_refused_with_a_reason(monkeypatch, tmp_path):
+    monkeypatch.setenv("USDM4_ALLOW_NO_LLM", "1")
+    client = TestClient(create_app(CoreConverter()))
+    corrupt = b"%PDF-1.4\n1 0 obj << /Broken >>\nnot a real pdf at all\n"
+    r = _post(client, data=corrupt)
+    assert r.status_code == 422 and r.json()["reason"] == "corrupt_pdf"
+    encrypted = _pdf_file(tmp_path, "enc.pdf", lambda d: d.new_page().insert_text((72, 72), "Secret"))
+    r = _post(client, data=encrypted)
+    assert r.status_code == 422 and r.json()["reason"] == "encrypted_pdf"
+
+
+def test_core_is_requested_only_when_the_flag_is_set(monkeypatch):
+    conv = CoreConverter()
+    monkeypatch.delenv("USDM4_RUN_CORE", raising=False)
+    assert conv.core_enabled() is False
+    monkeypatch.setenv("USDM4_RUN_CORE", "1")
+    assert conv.core_enabled() is True

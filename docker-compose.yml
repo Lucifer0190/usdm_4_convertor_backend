@@ -28,6 +28,11 @@ services:
       - OPEN_ROUTER_KEY=${OPEN_ROUTER_KEY:-}
       - USDM4_API_KEYS=${USDM4_API_KEYS:-}
       - USDM4_MAX_CONCURRENT=${USDM4_MAX_CONCURRENT:-2}
+      - USDM4_MAX_UPLOAD_MB=${USDM4_MAX_UPLOAD_MB:-60}
+      - USDM4_TIMEOUT_S=${USDM4_TIMEOUT_S:-900}
+      - USDM4_JOB_TTL_S=${USDM4_JOB_TTL_S:-3600}
+      - USDM4_RUN_CORE=${USDM4_RUN_CORE:-}
+      - CDISC_LIBRARY_API_KEY=${CDISC_LIBRARY_API_KEY:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 30s

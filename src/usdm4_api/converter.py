@@ -58,12 +58,40 @@ class CoreConverter:
         from usdm4_assure.llm.config import openrouter_key
         return bool(openrouter_key()) and not os.environ.get("USDM4_NO_LLM")
 
+    def core_enabled(self) -> bool:
+        """The official CDISC CORE gate runs when ``USDM4_RUN_CORE`` is set. Its result goes
+        in the report and never blocks a response; without ``CDISC_LIBRARY_API_KEY`` the
+        gate reports itself skipped (validate/gate.py)."""
+        import os
+        return os.environ.get("USDM4_RUN_CORE", "").lower() in ("1", "true", "yes")
+
+    @staticmethod
+    def _check_pdf(pdf_path: Path) -> None:
+        """Refuse a PDF that cannot be read at all, with a reason a client can act on."""
+        import pymupdf
+        try:
+            doc = pymupdf.open(str(pdf_path))
+        except Exception as exc:
+            raise ConversionError("The PDF is corrupt or unreadable.",
+                                  {"reason": "corrupt_pdf", "error": str(exc)[:200]}) from exc
+        try:
+            if doc.needs_pass or doc.is_encrypted:
+                raise ConversionError(
+                    "The PDF is password-protected; upload an unencrypted copy.",
+                    {"reason": "encrypted_pdf"})
+            if doc.page_count == 0:
+                raise ConversionError("The PDF has no readable pages (corrupt or empty).",
+                                      {"reason": "corrupt_pdf"})
+        finally:
+            doc.close()
+
     def convert(self, pdf_path: Path, work_dir: Path) -> ConversionResult:
         from usdm4_assure.ingest.pdf import ScannedPDFError
         from usdm4_assure.pipeline import run_full
 
+        self._check_pdf(pdf_path)
         try:
-            result = run_full(pdf_path, out_dir=work_dir)
+            result = run_full(pdf_path, out_dir=work_dir, run_core=self.core_enabled())
         except ScannedPDFError as exc:
             # Refused cleanly (PLAN.md task C-9), not a 500: no dependency this project
             # carries can read a scan with no text layer, so there is nothing to convert.
@@ -73,6 +101,7 @@ class CoreConverter:
         review = json.loads(review_path.read_text(encoding="utf-8")) if review_path.exists() else {}
         report = {
             "llm": self.llm_ready(),
+            "core_requested": self.core_enabled(),
             "run_id": result.run_id,
             "source_sha256": result.source_sha256,
             "decision_summary": review.get("decision_summary", {}),
