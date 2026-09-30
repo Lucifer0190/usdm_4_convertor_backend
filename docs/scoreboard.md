@@ -217,3 +217,32 @@ grounding contract (a verbatim quote, never an inferred or synthesised one). Thi
 same shape of finding as vendors above: it caps what a *grounded* score can show, and
 only the audited gold set (Q-4) can say whether "endpoint" should mean the table's own
 text or the reference's synthesised metric statement.
+
+## Arms/interventions fix and final train-set numbers (C-7), 2026-09-30
+
+Found while diagnosing arms recall: `eval/rubric.py` compared the reference's readable
+arm/intervention text against usdm4's own generated slug (`StudyArm.name`,
+`_label_to_name()` -> upper-cased, space-to-dash), not the extracted text usdm4 puts
+verbatim in `.label`. Fixed alongside a real extraction gap: several protocols enumerate
+arms as a bulleted list ("* Arm A: (...). ...running header... * Arm B: (...)"), which
+the comma/period-bounded parser only ever read as far as the first bullet.
+
+Full train-set numbers after every fix landed this session (rubric numeric tokens, SoA
+reader, C-8 no-fabrication, C-6 identifiers, arms fix, vision fallback):
+
+| | Deterministic | LLM readers on |
+|---|---:|---:|
+| **Overall accuracy** | 41.1% | **43.1%** |
+| **Overall recall** | 58.1% | **60.7%** |
+| arms | 56% | **89%** |
+| interventions | 42% | 58% |
+| scalars | 50% | **94%** |
+| identifiers | 78% | 87% |
+| estimands | 30% | 45% |
+| criteria, objectives | 81%, 83% | same |
+| activities, marks, visits, epochs | 30-67% | same (no LLM SoA reader is delivered — see the bake-off above) |
+| vendors | 0% | 0% (see the groundability finding above) |
+
+Per study, LLM: C5091017 74.4%, C4601003 52.1%, C4891001 31.4%, C4891002 21.8%,
+C4891006 36.3%. Reports: `spikes/reports/benchmark_train_det.md`,
+`spikes/reports/benchmark_train_llm.md`.

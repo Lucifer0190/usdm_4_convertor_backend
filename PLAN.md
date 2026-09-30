@@ -109,9 +109,9 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 |---|---|---|
 | C-5 | Objectives and endpoints reader for two-column, phase-split and per-population tables | ≥ 90% held-out on those categories |
 | C-6 | Identifiers ~~done~~: 17%->78% recall on train (`extract/identifiers.py`). **Vendors: evidence, not yet an extractor** — most reference vendor names are not literally in the protocol text (grounding would require fabrication); see `docs/scoreboard.md`. Narrative sections: not started | measured recall per category |
-| C-7 | LLM readers for arms, interventions, sponsor, version, estimand attributes (already built): measure and tune on train only | scored with `--llm` |
+| C-7 | ~~Measure LLM readers on train~~ **done**: 41.1%->43.1% overall (det->LLM); arms 56%->89% after a rubric bug (scored usdm4's generated slug, not the extracted label) and a bulleted-arm-list extraction fix | scored with `--llm` |
 | C-8 | ~~Remove placeholder fabrication~~ **done**: gaps are left `""`/`[]` (verified against usdm4's own assembler-input schema + an empirical probe) and reported; the one exception is `Organization.name`/`Study.name`, which the pinned library's schema requires non-empty (`Field(min_length=1)`) — those get a single unmistakable sentinel (`[not extracted]`), only when no real fallback (acronym, protocol id) exists | no invented values in output |
-| C-9 | OCR fallback for scanned pages | a scanned test PDF converts or is refused cleanly |
+| C-9 | ~~OCR fallback~~ **done as clean refusal**: `ingest.ScannedPDFError` when 80%+ of pages have no text layer; API returns 422 `scanned_pdf_no_ocr`. Real OCR needs a Tesseract dependency, deferred pending approval | a scanned test PDF converts or is refused cleanly |
 
 ### CP-F · Opus / high · Assurance on real data (M4)
 | ID | Task | Done when |

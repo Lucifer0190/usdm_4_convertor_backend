@@ -1,31 +1,31 @@
 # Benchmark - LLM readers on
 
-Studies: 5 | reference items 976 | matched 566 | spurious 416
+Studies: 5 | reference items 976 | matched 592 | spurious 397
 
-**Accuracy (matched / (reference + spurious)): 40.7%**  |  recall 58.0%
+**Accuracy (matched / (reference + spurious)): 43.1%**  |  recall 60.7%
 
 | Study | Accuracy | Recall | Matched | Reference | Spurious | Seconds |
 |---|---:|---:|---:|---:|---:|---:|
-| C5091017 | 75.2% | 91.6% | 240 | 262 | 57 | 206 |
-| C4601003 | 38.9% | 56.8% | 84 | 148 | 68 | 394 |
-| C4891001 | 29.0% | 56.3% | 98 | 174 | 164 | 265 |
-| C4891002 | 21.3% | 29.0% | 63 | 217 | 79 | 302 |
-| C4891006 | 36.3% | 46.3% | 81 | 175 | 48 | 306 |
+| C5091017 | 74.4% | 92.0% | 241 | 262 | 62 | 51 |
+| C4601003 | 52.1% | 67.6% | 100 | 148 | 44 | 64 |
+| C4891001 | 31.4% | 59.2% | 103 | 174 | 154 | 47 |
+| C4891002 | 21.8% | 30.4% | 66 | 217 | 86 | 64 |
+| C4891006 | 36.3% | 46.9% | 82 | 175 | 51 | 62 |
 
 ## By category (all studies pooled)
 
 | Category | Matched | Reference | Delivered | Recall |
 |---|---:|---:|---:|---:|
 | scalars | 32 | 34 | 34 | 94% |
-| identifiers | 4 | 23 | 5 | 17% |
+| identifiers | 20 | 23 | 27 | 87% |
 | arms | 8 | 9 | 9 | 89% |
 | interventions | 7 | 12 | 9 | 58% |
 | criteria | 92 | 114 | 107 | 81% |
 | objectives | 35 | 42 | 62 | 83% |
-| endpoints | 39 | 73 | 111 | 53% |
-| estimands | 10 | 20 | 15 | 50% |
-| epochs | 8 | 20 | 28 | 40% |
-| encounters | 23 | 60 | 58 | 38% |
-| activities | 163 | 245 | 177 | 67% |
-| marks | 145 | 290 | 362 | 50% |
-| vendors | 0 | 34 | 5 | 0% |
+| endpoints | 38 | 73 | 111 | 52% |
+| estimands | 9 | 20 | 15 | 45% |
+| epochs | 6 | 20 | 13 | 30% |
+| encounters | 38 | 60 | 50 | 63% |
+| activities | 165 | 245 | 180 | 67% |
+| marks | 142 | 290 | 365 | 49% |
+| vendors | 0 | 34 | 7 | 0% |
