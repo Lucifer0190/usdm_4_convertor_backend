@@ -20,6 +20,32 @@ from usdm4_assure.extract.objectives import ObjectivesExtract
 from usdm4_assure.extract.soa.grid import AssuredGrid
 from usdm4_assure.validate.gate import validate_wrapper
 
+# scope.standard keys usdm4's IdentificationAssembler recognises (STANDARD_ORGS); each
+# maps a C6-extracted registry/regulatory field to the org usdm4 builds for it.
+_STANDARD_SCOPE = {"nct": "nct", "euCt": "ema", "eudract": "ema", "ind": "fda-ind", "pip": "other"}
+
+
+def _extra_identifiers(identifiers: dict[str, str | None], sponsor_name: str | None) -> list[dict]:
+    """Registry/regulatory/compound ``StudyIdentifier`` entries (task C-6), beyond the
+    sponsor protocol identifier every study always carries at index 0.
+
+    A compound code has no registry of its own; scoping it to the sponsor organisation
+    (by name, matching index 0) makes usdm4's identification assembler attach it to that
+    same ``Organization`` instead of minting a second one for it.
+    """
+    out: list[dict] = []
+    for field, standard in _STANDARD_SCOPE.items():
+        value = identifiers.get(field)
+        if value:
+            out.append({"identifier": value, "scope": {"standard": standard}})
+    compound = identifiers.get("compound")
+    if compound:
+        for code in dict.fromkeys(c.strip() for c in compound.split(",") if c.strip()):
+            out.append({"identifier": code, "scope": {"non_standard": {
+                "type": "unknown", "role": "sponsor",
+                "name": sponsor_name or "", "label": sponsor_name or ""}}})
+    return out
+
 
 def _interventions_from_arms(design: DesignExtract) -> tuple[list[dict], dict]:
     """One StudyIntervention per arm; return interventions + arm->names map.
@@ -51,7 +77,8 @@ def _objectives_block(objs: ObjectivesExtract) -> dict:
 
 def _assembler_input(meta: dict, design: DesignExtract, ag: AssuredGrid,
                      elig: EligibilityExtract, objs: ObjectivesExtract,
-                     estimands: EstimandsExtract | None = None
+                     estimands: EstimandsExtract | None = None,
+                     identifiers: dict[str, str | None] | None = None,
                      ) -> tuple[dict, list[Finding]]:
     """The *raw* assembler input: extracted values only, ``None`` wherever
     extraction found nothing. :func:`usdm4_assure.assemble.sanitize.sanitize`
@@ -74,7 +101,7 @@ def _assembler_input(meta: dict, design: DesignExtract, ag: AssuredGrid,
                  "scope": {"non_standard": {"type": None, "role": "sponsor",
                                             "name": meta.get("sponsorName"),
                                             "label": meta.get("sponsorName")}}}
-            ],
+            ] + _extra_identifiers(identifiers or {}, meta.get("sponsorName")),
         },
         "document": {
             "document": {"label": "Protocol", "version": version, "status": "final",
@@ -113,7 +140,8 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
                      run_core: bool = False,
                      estimands: EstimandsExtract | None = None,
                      amendments: dict | None = None,
-                     sites: dict[str, str | None] | None = None) -> dict:
+                     sites: dict[str, str | None] | None = None,
+                     identifiers: dict[str, str | None] | None = None) -> dict:
     """Assemble one complete USDM 4.0 study from every domain's assured output.
 
     Composes a data4knowledge ``AssemblerInput`` from the extracted domains, runs
@@ -135,6 +163,10 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
         sites: Extracted organization names (task 6.4,
             ``extract.sites.FIELDS``), attached after assembly since the
             assembler's own input schema cannot represent them.
+        identifiers: Registry/regulatory/compound identifiers (task C-6,
+            ``extract.identifiers.FIELDS``): NCT, EU CT/EudraCT, US IND, PIP,
+            compound codes — added to ``identification.identifiers`` alongside
+            the sponsor protocol identifier that is always present.
 
     Returns:
         A dict with keys ``ok`` (bool), ``wrapper`` (the USDM dict or ``None``),
@@ -147,7 +179,7 @@ def build_full_study(assured_meta: list[AssuredField], design: DesignExtract,
     elig = elig or EligibilityExtract()
     objs = objs or ObjectivesExtract()
     meta = {a.field: a.value for a in assured_meta if a.value}
-    raw, findings = _assembler_input(meta, design, ag, elig, objs, estimands)
+    raw, findings = _assembler_input(meta, design, ag, elig, objs, estimands, identifiers)
     if amendments:
         raw["amendments"] = amendments
     data, repairs = sanitize(raw)

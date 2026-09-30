@@ -35,6 +35,8 @@ from usdm4_assure.contracts import (
 from usdm4_assure.extract import metadata as c1
 from usdm4_assure.extract.domains import extract_domain
 from usdm4_assure.extract.estimands import estimand_evidence, extract_estimands
+from usdm4_assure.extract.identifiers import FIELDS as IDENTIFIER_FIELDS
+from usdm4_assure.extract.identifiers import extract_identifiers
 from usdm4_assure.extract.sites import FIELDS as SITES_FIELDS
 from usdm4_assure.extract.sites import extract_sites
 from usdm4_assure.extract.windows import window_for
@@ -196,6 +198,12 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
     sites_cands = extract_sites(sites_doc, get_role_llm("route"))
     assured_sites = assure(sites_cands, sites_doc, SITES_FIELDS, domain="sites")
     sites_values = {a.field: a.value for a in assured_sites if a.value}
+    # Registry/regulatory/compound identifiers (task C-6): the rest of the same title-page
+    # label block C1 metadata's protocol number comes from, so the whole document (front
+    # matter only, enforced inside the extractor) is a fine scope — no dedicated window.
+    id_cands = extract_identifiers(doc)
+    assured_identifiers = assure(id_cands, doc, IDENTIFIER_FIELDS, domain="identifiers")
+    identifier_values = {a.field: a.value for a in assured_identifiers if a.value}
     # The stitcher (task 2.3) is multi-page-aware; a table it can't confidently
     # reduce to the 3-header-row shape falls back to the single-page path.
     # ``soa_pages`` is the schedule-of-activities section's page range (None when the
@@ -250,7 +258,8 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         return build_full_study(st["metadata"].fields, st["design"].extract, grid,
                                 st["eligibility"].extract, st["objectives"].extract,
                                 run_core=run_core, estimands=estimands,
-                                amendments=amendments_data, sites=sites_values)
+                                amendments=amendments_data, sites=sites_values,
+                                identifiers=identifier_values)
 
     def revalidate(st: dict) -> list[str]:
         nonlocal study
