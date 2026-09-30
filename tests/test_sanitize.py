@@ -64,15 +64,36 @@ def test_complete_input_reports_only_the_never_extracted_placeholders(grid):
         findings, Severity.WARNING)
 
 
-def test_invented_substantive_values_are_errors(grid):
+def test_never_extracted_fields_are_left_empty_not_invented(grid):
+    """PLAN.md task C-8: a gap is reported and left empty, never filled with text that
+    reads like a real answer."""
     raw = _raw(grid, meta={"studyTitle": "Study X"}, design=DesignExtract(arms=[]),
                elig=EligibilityExtract())
     clean, findings = sanitize(raw)
     assert {"protocolIdentifier", "studyPhase", "interventionModel", "inclusionCriteria",
             "exclusionCriteria"} <= _fields(findings, Severity.ERROR)
-    assert clean["study_design"]["trial_phase"] == "Phase 1"      # same repair as before...
+    assert clean["study_design"]["trial_phase"] == ""                    # not "Phase 1"
+    assert clean["study_design"]["intervention_model"] == ""             # not "Parallel"
+    assert clean["identification"]["identifiers"][0]["identifier"] == "" # not "SPONSOR-0000"
+    assert clean["population"]["inclusion_exclusion"]["inclusion"] == [] # not a made-up criterion
     phase = next(f for f in findings if f.field == "studyPhase")
-    assert "'Phase 1'" in phase.message                            # ...but now it is reported
+    assert "left empty" in phase.message and "Phase 1" not in phase.message
+    assert phase.found is None                                          # nothing to grep for
+
+
+def test_never_extracted_document_fields_carry_no_invented_text(grid):
+    clean, findings = sanitize(_raw(grid, meta={k: v for k, v in META.items()
+                                               if k != "studyVersionIdentifier"}))
+    assert clean["document"]["document"]["version_date"] == ""   # not "2026-01-01"
+    assert clean["document"]["sections"] == []                   # not a fake Synopsis section
+    assert clean["study_design"]["rationale"] == ""               # not "Derived from ..."
+    assert clean["study"]["rationale"] == ""                      # not "Assembled by ..."
+    blob = str(clean)
+    for invented in ("2026-01-01", "Synopsis extracted", "Derived from protocol synopsis",
+                     "Assembled by USDM4-Assure", "Untitled Study", "SPONSOR-0000",
+                     "Unknown Sponsor", "Adults >= 18 years"):
+        assert invented not in blob
+    assert {"versionDate", "documentSections"} <= _fields(findings, Severity.WARNING)
 
 
 def test_missing_acronym_is_derived_and_reported(grid):
@@ -192,9 +213,31 @@ def test_sponsor_is_scoped_as_a_sponsor_organisation(grid):
     assert [r["code"]["decode"] for r in sv["roles"]] == ["Clinical Study Sponsor"]
 
 
-def test_missing_sponsor_name_is_an_error_placeholder(grid):
+def test_missing_sponsor_name_is_flagged_and_gets_the_one_required_sentinel(grid):
     clean, findings = sanitize(_raw(grid, meta={k: v for k, v in META.items()
                                                if k != "sponsorName"}))
     assert "sponsorName" in _fields(findings, Severity.ERROR)
-    assert clean["identification"]["identifiers"][0]["scope"]["non_standard"]["name"] == \
-        "Unknown Sponsor"
+    org = clean["identification"]["identifiers"][0]["scope"]["non_standard"]
+    # usdm4's Organization.name cannot be empty (Field(min_length=1)): this is the one
+    # field the sentinel is used for, and it is unmistakably synthetic, not fabricated data.
+    assert org["name"] == "[not extracted]"
+    assert org["label"] == ""                # label has no such constraint: stays empty
+    assert org["type"] == "unknown"           # a CDISC code, not a fabricated fact
+
+
+def test_nothing_extracted_at_all_still_assembles(grid):
+    """The extreme case task C-8 has to survive: title, sponsor, protocol id, phase and
+    intervention model are all missing at once. usdm4's Study.name and Organization.name
+    still get their one sentinel; everything else stays empty and the assembler succeeds."""
+    from usdm4_assure.assemble.fallback import assemble
+
+    raw = _raw(grid, meta={}, design=DesignExtract(arms=[]), elig=EligibilityExtract())
+    clean, findings = sanitize(raw)
+    assert clean["study"]["name"] == {"acronym": "[not extracted]"}
+    assert clean["study_design"]["trial_phase"] == ""
+    out = assemble(clean)
+    assert out.study_ok, out.errors
+    sv = out.wrapper["study"]["versions"][0]
+    assert sv["organizations"][0]["name"] == "[not extracted]"
+    assert {"studyTitle", "sponsorName", "protocolIdentifier"} <= _fields(
+        findings, Severity.ERROR)

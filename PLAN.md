@@ -110,7 +110,7 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 | C-5 | Objectives and endpoints reader for two-column, phase-split and per-population tables | ≥ 90% held-out on those categories |
 | C-6 | Identifiers (IND, EU CT, NCT, PIP, compound), vendors and organisations, narrative sections | measured recall per category |
 | C-7 | LLM readers for arms, interventions, sponsor, version, estimand attributes (already built): measure and tune on train only | scored with `--llm` |
-| C-8 | Remove placeholder fabrication in `assemble/sanitize.py`; missing data stays missing and is flagged | no invented values in output |
+| C-8 | ~~Remove placeholder fabrication~~ **done**: gaps are left `""`/`[]` (verified against usdm4's own assembler-input schema + an empirical probe) and reported; the one exception is `Organization.name`/`Study.name`, which the pinned library's schema requires non-empty (`Field(min_length=1)`) — those get a single unmistakable sentinel (`[not extracted]`), only when no real fallback (acronym, protocol id) exists | no invented values in output |
 | C-9 | OCR fallback for scanned pages | a scanned test PDF converts or is refused cleanly |
 
 ### CP-F · Opus / high · Assurance on real data (M4)
