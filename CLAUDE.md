@@ -28,7 +28,17 @@ CI (`.github/workflows/ci.yml`) runs ruff check, guard.py, pytest, in that order
 - Model choice: use frontier LLMs by default. Use a small model (SLM) only where a measured eval shows it
   beats the LLM deterministically. Never pick a model to save cost. Roles are in `config/models.yaml`.
 
+## Measuring accuracy
+- Benchmark: `python spikes/run_benchmark.py --ddf-root "<packet dir>" --out <dir> [--llm]` (train studies only).
+  Held-out studies need `--confirm-heldout` and are scored rarely; never tune on them (`eval/split.py`).
+- The packet is Pfizer data outside git. Cite before/after numbers for any extraction change. Check a miss
+  against the PDF before "fixing" it: the reference files are not gold (see `docs/onboarding.md`).
+- `docs/onboarding.md` is the reading order for anyone new to the project.
+
 ## Gotchas
+- usdm4 sets `StudyArm.name` to an upper-cased slug and keeps the real text in `label`: compare `label`.
+- Missing data stays empty and is reported (`assemble/sanitize.py`); never fill a gap with a plausible value.
+- CORE (`validate_core`) returns a different result object from d4k; `validate/gate.py` summarises both.
 - `tests/conftest.py` sets `USDM4_NO_LLM=1`. Tests never call a live model or write to the real `data/audit/`.
 - `.env` holds API keys (`OPEN_ROUTER_KEY`, `ANTHROPIC_API_KEY`, `CDISC_LIBRARY_API_KEY`). Never read, print,
   or stage it. `data/` (except `data/labels/`) and `spikes/_work/` are gitignored; keep it that way.

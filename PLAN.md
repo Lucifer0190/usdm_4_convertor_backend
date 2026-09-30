@@ -76,7 +76,7 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 | H-1 | ~~Fix ruff errors~~ **done** (`ruff check` clean, 557 tests pass). Deferred by decision: the 400-line guard fails on `pipeline.py` and `extract/soa/geometry.py`; we run tests locally and do not rely on GitHub CI for now | ruff clean; split the two files when CI is switched on |
 | H-2 | ~~Add `.gitattributes`~~ **done** | no whole-file diffs on Windows |
 | H-3 | ~~Point references at this plan or the archive~~ **done** | no link to a missing `DEVPLAN.md` |
-| H-4 | Push `dev` to the backend repo (`origin` now points to `usdm_4_convertor_backend`; the old repo is remote `legacy`) | `dev` visible on GitHub |
+| H-4 | ~~Push `dev` to the backend repo~~ **done** | `dev` visible on GitHub |
 
 ### CP-B · Sonnet / medium · Backend hardening (M5)
 | ID | Task | Done when |
@@ -118,7 +118,7 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 |---|---|---|
 | C-10 | Calibrate confidence on gold; conformal threshold decides auto-accept vs review. **Blocked on Q-4 (audited gold, decision D1)** | risk-coverage curve on held-out |
 | C-11 | ~~Triage d4k rules on real studies~~ **done**: 12 failing rules -> 8; five were our bugs (fixed), the rest classified in `docs/conformance.md` | each failure classed as our bug, rule bug or data issue |
-| C-12 | Real CORE run with the CDISC key; compare with d4k. **Blocked: `CDISC_LIBRARY_API_KEY` not set** | `docs/conformance.md` updated |
+| C-12 | **Run, partly usable**: CORE ran on the 5 train studies (205 rules). Terminology packages are members-only (401 on the free key), so 1,336 of 1,558 findings are un-judgeable; the 8 evaluable rules are classified in `docs/conformance.md`. **Open:** fix CORE-000938 (estimand not linked to an intervention) and CORE-000971 (sponsor address not read); re-run once a terminology source exists (CDISC membership) | `docs/conformance.md` updated |
 | C-13 | ~~Pin `cdisc-rules-engine`~~ **done**: `==0.17.1` | pin recorded |
 
 Order: **CP-A → CP-C (Q-1, Q-2, Q-4 start now, it is the long pole) → CP-D → CP-E → CP-F**, with CP-B slotted

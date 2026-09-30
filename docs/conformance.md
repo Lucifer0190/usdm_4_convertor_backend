@@ -151,3 +151,35 @@ accuracy was unaffected (43.1% -> 43.3%).
 Remaining **errors** are therefore one rule-library bug, one protocol-vs-rule conflict, one
 USDM model limitation and one data gap. CORE (C-12) has not been run: it needs
 `CDISC_LIBRARY_API_KEY`, which is not configured.
+
+## First real CORE run (PLAN.md task C-12, 2026-09-30)
+
+The official CDISC CORE engine (`cdisc-rules-engine` 0.17.1, 205 USDM 4.0 rules executed) run on the
+five train studies (`spikes/_core_run.py`, results in `data/out/<run>/core_results.json`). Each study
+takes 10-20 s. Every study fails, with 230-400 findings across 30 rules.
+
+**The headline number is not usable yet: terminology could not be loaded.** CDISC Library serves the
+controlled-terminology packages as "Members-only content" (HTTP 401 with the free key; the rules
+endpoint, 207 rules, works). CORE therefore ran with 0 terminology packages, and **1,336 of the 1,558
+findings (23 of 31 rules)** are the single complaint "codeSystemVersion is not a valid terminology
+package date" / "code or decode not in the codelist". Those cannot be judged as right or wrong until a
+terminology source is available (CDISC membership, or CT packages supplied another way). Do not quote
+the raw CORE count as a conformance result.
+
+The 8 rules that do not depend on terminology, classified:
+
+| CORE rule | d4k equivalent | Studies | Classification |
+|---|---|---:|---|
+| CORE-000871 (one primary objective) | DDF00084 | 3/5 | Rule vs protocol (see above) |
+| CORE-001009 (age range min < max) | DDF00241 | 5/5 | USDM model limitation (see above) |
+| CORE-001065 (intervention referenced by a procedure) | DDF00101 | 5/5 | Upstream: the assembler does not wire it |
+| CORE-001076 (activity refers to a procedure/BC) | DDF00075 | 5/5 | Deliberate gap (no invented codes) |
+| CORE-000938 (cardinality) | none | 3/5 | **Ours**: `Estimand.interventionIds` is empty when the estimand's treatment cannot be matched to an extracted intervention (`assemble/estimands.py`) |
+| CORE-000971 (address has an attribute) | none | 5/5 | **Data gap, extractable**: the sponsor's organisation gets an empty address; page 1 states "Sponsor Legal Address: ..." and is not read |
+| CORE-000873 / CORE-001068 (unique governance dates) | none | 5/5 | Unclear: the finding lists every value as "Not in dataset" while no dates are set, which looks like an engine artefact on an empty date list; unverified |
+
+Not yet done: fixing CORE-000938 and CORE-000971 (both small, both ours), and re-running CORE once
+terminology is available.
+
+Also fixed: `validate/gate.py` summarised CORE with the d4k result shape and so reported it empty;
+it now reads CORE's own result (`_summarize_core`).

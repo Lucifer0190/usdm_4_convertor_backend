@@ -40,6 +40,21 @@ def _summarize(result) -> dict:
             "failed_rules": failed_rules}
 
 
+def _summarize_core(result) -> dict:
+    """CORE's result object is not the d4k one (no ``passed``/``outcomes``): it carries
+    ``findings`` (one per failing rule, each with its instances), ``execution_errors``
+    (rules that could not run on this file) and the controlled-terminology packages it
+    actually loaded. Summarised in the same shape as :func:`_summarize` plus those."""
+    findings = getattr(result, "findings", []) or []
+    return {"passed": bool(getattr(result, "is_valid", False)),
+            "rules_run": getattr(result, "rules_executed", None),
+            "findings": getattr(result, "finding_count", None),
+            "failed_rules": [f.rule_id for f in findings],
+            "rules_skipped": getattr(result, "rules_skipped", None),
+            "execution_errors": getattr(result, "execution_error_count", None),
+            "ct_packages_loaded": len(getattr(result, "ct_packages_loaded", []) or [])}
+
+
 def validate_wrapper(wrapper: dict, *, run_core: bool = False) -> dict:
     """Validate an in-memory USDM wrapper dict through all available gates.
 
@@ -88,7 +103,7 @@ def validate_wrapper(wrapper: dict, *, run_core: bool = False) -> dict:
                 report["core"] = {"skipped": "CDISC_LIBRARY_API_KEY not set"}
             else:
                 try:
-                    report["core"] = _summarize(USDM4().validate_core(str(p)))
+                    report["core"] = _summarize_core(USDM4().validate_core(str(p)))
                 except Exception as e:  # noqa: BLE001
                     report["core"] = {"error": str(e)[:300]}
         else:

@@ -29,6 +29,7 @@ nav:
   - Pipeline & contracts: pipeline.md
   - Module reference: modules.md
   - Conformance & limitations: conformance.md
+  - Onboarding: onboarding.md
   - Development: development.md
   - References: references.md
 markdown_extensions:
