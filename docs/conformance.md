@@ -119,7 +119,7 @@ decision rather than silent drift.
 ## d4k triage on real protocols (PLAN.md task C-11, 2026-09-30)
 
 Every d4k failure on the five train studies, classified per instance with
-`spikes/_d4k_triage.py` (rule text, class, attribute, message and path for each finding),
+`spikes/diag_d4k_triage.py` (rule text, class, attribute, message and path for each finding),
 not from the failing-rules list alone. The fixture-based section above predates real data:
 seven rules that never fired on the fixture fired on real protocols.
 
@@ -155,7 +155,7 @@ USDM model limitation and one data gap. CORE (C-12) has not been run: it needs
 ## First real CORE run (PLAN.md task C-12, 2026-09-30)
 
 The official CDISC CORE engine (`cdisc-rules-engine` 0.17.1, 205 USDM 4.0 rules executed) run on the
-five train studies (`spikes/_core_run.py`, results in `data/out/<run>/core_results.json`). Each study
+five train studies (`spikes/diag_core_run.py`, results in `data/out/<run>/core_results.json`). Each study
 takes 10-20 s. Every study fails, with 230-400 findings across 30 rules.
 
 **The headline number is not usable yet: terminology could not be loaded.** CDISC Library serves the

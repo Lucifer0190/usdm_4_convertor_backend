@@ -2,7 +2,7 @@
 
 The usdm4 assembler needs *type-correct* input (a `str` field cannot hold `None`), but not
 a *complete* one: every field this module fills is optional in `usdm4`'s own assembler-input
-schema (`str = ""` / `list = []`), confirmed empirically in `spikes/_sanitize_probe.py` — the
+schema (`str = ""` / `list = []`), confirmed empirically in `spikes/diag_sanitize_probe.py` — the
 assembler runs to completion with each one genuinely empty. So gaps are filled with the
 type's own empty value, never with text that reads like a real answer: a missing phase is
 left `""`, not turned into "Phase 1"; missing eligibility is left `[]`, not the invented

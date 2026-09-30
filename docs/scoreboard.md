@@ -169,7 +169,7 @@ formatting inconsistency, not an extraction gap; the audited gold set (Q-4) shou
 
 Checked whether the reference's "vendors" (organisations other than the sponsor) are
 literally present in the protocol text they are supposedly extracted from, across the 3
-studies with the most vendor items (`spikes/_vendor_probe.py`). Result is split:
+studies with the most vendor items (`spikes/diag_vendor_probe.py`). Result is split:
 
 - **Generic role-based names never appear**: "Central Laboratory", "Central Imaging
   Vendor", "Central ECG Vendor", "IRT/RTSM System", "eCOA/ePRO Vendor" — 0 occurrences in
@@ -191,7 +191,7 @@ whether "vendors" in the gold standard is meant to be grounded in the protocol P
 ## Objectives/endpoints reader (C-5): a reference-paraphrase finding
 
 Checked every endpoint miss on 3 studies against the actual protocol table
-(`spikes/_obj_bestmatch.py`, `spikes/_obj_diff.py`), cell by cell:
+(`spikes/diag_obj_bestmatch.py`, `spikes/diag_obj_diff.py`), cell by cell:
 
 - **C5091017** (the study the readers were built against): 10 of 11 reference endpoints
   match at 0.5-1.0 Jaccard. The extraction is correctly reading the Objectives/Endpoints/

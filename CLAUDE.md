@@ -24,7 +24,7 @@ CI (`.github/workflows/ci.yml`) runs ruff check, guard.py, pytest, in that order
   reference extractor: exempt from the limit and not given tests. No hard-coded `C:\` or `/home/` paths in src.
 - Google-style docstrings, typed public signatures, 100-char lines. Comments explain why, not what.
 - Do NOT run `ruff format` on the tree: ~120 files aren't formatted, so it would rewrite them all.
-- Throwaway scripts go in `spikes/_*.py` (gitignored), never in the tree.
+- Throwaway scripts go in `spikes/_*.py` (gitignored). Diagnostics worth keeping are tracked as `spikes/diag_*.py` (cited by the docs).
 - Model choice: use frontier LLMs by default. Use a small model (SLM) only where a measured eval shows it
   beats the LLM deterministically. Never pick a model to save cost. Roles are in `config/models.yaml`.
 

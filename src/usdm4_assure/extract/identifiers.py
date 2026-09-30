@@ -1,7 +1,7 @@
 """Extraction — registry, regulatory and compound identifiers (PLAN.md task C-6).
 
 Every Pfizer protocol sampled (13 of 15 studies checked outside the benchmark set, plus
-all 5 train studies — `spikes/_ids_layouts.py`) carries a consistent "Label: value" block
+all 5 train studies — `spikes/diag_ids_layouts.py`) carries a consistent "Label: value" block
 on page 1, immediately around the protocol number C1 metadata already reads: a US IND
 number, an EU CT number (or the older EudraCT number, pre-2022 trials), the
 ClinicalTrials.gov (NCT) id, sometimes a Pediatric Investigational Plan (PIP) number, and
