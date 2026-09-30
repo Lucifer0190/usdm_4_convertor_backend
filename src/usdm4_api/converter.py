@@ -59,9 +59,15 @@ class CoreConverter:
         return bool(openrouter_key()) and not os.environ.get("USDM4_NO_LLM")
 
     def convert(self, pdf_path: Path, work_dir: Path) -> ConversionResult:
+        from usdm4_assure.ingest.pdf import ScannedPDFError
         from usdm4_assure.pipeline import run_full
 
-        result = run_full(pdf_path, out_dir=work_dir)
+        try:
+            result = run_full(pdf_path, out_dir=work_dir)
+        except ScannedPDFError as exc:
+            # Refused cleanly (PLAN.md task C-9), not a 500: no dependency this project
+            # carries can read a scan with no text layer, so there is nothing to convert.
+            raise ConversionError(str(exc), {"reason": "scanned_pdf_no_ocr"}) from exc
         wrapper = (result.study or {}).get("wrapper")
         review_path = work_dir / "review.json"
         review = json.loads(review_path.read_text(encoding="utf-8")) if review_path.exists() else {}

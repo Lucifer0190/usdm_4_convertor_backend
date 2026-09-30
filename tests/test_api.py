@@ -109,3 +109,21 @@ def test_the_real_core_converts_the_synthetic_protocol_end_to_end(monkeypatch):
     assert version["studyDesigns"][0]["arms"]
     assert body["report"]["validation"]["structural"]["passed"] is True
     assert body["report"]["run_id"]
+
+
+def test_a_scanned_pdf_with_no_text_layer_is_refused_cleanly_not_a_500(monkeypatch, tmp_path):
+    monkeypatch.setenv("USDM4_ALLOW_NO_LLM", "1")
+    import pymupdf
+    doc = pymupdf.open()
+    for _ in range(10):
+        page = doc.new_page(width=612, height=792)
+        page.draw_rect(pymupdf.Rect(50, 50, 550, 750), color=(0, 0, 0))
+    scan_path = tmp_path / "scan.pdf"
+    doc.save(str(scan_path))
+    doc.close()
+
+    client = TestClient(create_app(CoreConverter()))
+    r = client.post("/v1/convert", files={"file": ("scan.pdf", scan_path.read_bytes(),
+                                                    "application/pdf")})
+    assert r.status_code == 422
+    assert r.json()["reason"] == "scanned_pdf_no_ocr"

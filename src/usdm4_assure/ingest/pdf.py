@@ -12,6 +12,34 @@ import pymupdf  # PyMuPDF
 from usdm4_assure.contracts import Block, CharSpan, Document
 from usdm4_assure.ingest.geometry import page_geometry
 
+# A page under this many characters is, for our purposes, blank — a stray character or
+# two (a stamp, a page number) should not count as "this page has a text layer", but a
+# real page, however terse (a title page, a section divider), always clears it: this is
+# a detector for "no text layer at all" (a scan), not for "not enough prose".
+_MIN_PAGE_TEXT_CHARS = 3
+_SCANNED_PAGE_RATIO = 0.8   # this share of blank pages means "no OCR text layer" (task C-9)
+
+
+class ScannedPDFError(RuntimeError):
+    """Raised by :func:`ingest` when a PDF has (almost) no extractable text layer.
+
+    Most likely a scan with no OCR run on it. Every reader in this project works from
+    the text layer (grounding a value means finding its exact substring in it), so
+    there is nothing safe to extract — better to refuse clearly here than to silently
+    deliver an empty or near-empty study (PLAN.md task C-9: "converts or is refused
+    cleanly"). Running OCR is a real dependency (Tesseract) this project does not carry
+    yet; adding it is a decision for a future task, not silently bundled with this one.
+    """
+
+    def __init__(self, pdf_path: Path, blank_pages: int, total_pages: int) -> None:
+        self.pdf_path = pdf_path
+        self.blank_pages = blank_pages
+        self.total_pages = total_pages
+        super().__init__(
+            f"{pdf_path}: {blank_pages} of {total_pages} pages have no extractable text "
+            "layer. This looks like a scanned document without OCR; this project does "
+            "not run OCR, so it cannot be converted.")
+
 
 def _classify(text: str, size: float, page_median_size: float) -> str:
     """Cheap block-kind heuristic. Real system refines this; enough for the spine."""
@@ -50,6 +78,7 @@ def ingest(pdf_path: str | Path, image_dir: str | Path | None = None,
     blocks: list[Block] = []
     full_parts: list[str] = []
     chars: dict[int, list[CharSpan]] = {}
+    page_text_chars = [0] * doc.page_count
 
     for pno in range(doc.page_count):
         page = doc[pno]
@@ -83,6 +112,13 @@ def ingest(pdf_path: str | Path, image_dir: str | Path | None = None,
                 kind=_classify(text, max_size, median),
             ))
             full_parts.append(text)
+            page_text_chars[pno] += len(text)
+
+    blank_pages = sum(1 for n in page_text_chars if n < _MIN_PAGE_TEXT_CHARS)
+    total_pages = doc.page_count
+    if total_pages and blank_pages / total_pages >= _SCANNED_PAGE_RATIO:
+        doc.close()
+        raise ScannedPDFError(pdf_path, blank_pages, total_pages)
 
     page_images: list[Path] = []
     if image_dir is not None:
