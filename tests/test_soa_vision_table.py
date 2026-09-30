@@ -33,7 +33,7 @@ def test_stitch_joins_continuation_pages_and_keeps_same_named_columns_apart():
     p2 = PageReading(2, cols, [{"activity": "ECG", "group": False, "marks": [2]}])
     g = stitch([p1, p2])
     assert g.visits == ["Screening", "Day 1", "Day 1"]          # two Day 1 columns stay two
-    assert g.epochs == ["Screening", "Cycle 1", "Cycle 1"]      # merged band carried right
+    assert g.epochs == ["Screening Period", "Cycle 1", "Cycle 1"]   # band carried right, normalised
     assert (g.activities.index("ECG"), 2) in g.cells
 
 
@@ -85,3 +85,19 @@ def test_a_continuation_page_is_told_the_columns_already_found():
     assert _known_columns([]) == ""
     text = _known_columns([PageReading(1, [{"visit": "Week 8"}, {"visit": "ET"}], [])])
     assert "0. Week 8" in text and "1. ET" in text and "exactly these names" in text
+
+
+def test_vision_names_take_the_geometry_shape():
+    from usdm4_assure.extract.soa.vision_table import _column_name
+    assert _column_name({"visit_number": "1a a", "visit": "Telephone Call"}) == "Visit 1a"
+    assert _column_name({"visit_number": "", "visit": "EOT a"}) == "EOT"
+    g = stitch([PageReading(1, [{"visit": "Day 1", "epoch": "Screen."}], [])])
+    assert g is None                                  # no rows at all: nothing to deliver
+    g = stitch([PageReading(1, [{"visit": "Day 1", "epoch": "Screen."}],
+                            [{"activity": "Consent", "group": False, "marks": [0]}])])
+    assert g.epochs == ["Screening Period"]
+
+
+def test_a_footnote_only_continuation_page_is_read_not_failed():
+    r = _parse('{"is_schedule": true, "columns": [{"visit": "Day 1"}], "rows": []}', 7)
+    assert r is not None and r.rows == []

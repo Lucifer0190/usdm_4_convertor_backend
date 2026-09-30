@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from usdm4_assure.extract.soa.geometry import _visit_key
+from usdm4_assure.extract.soa.geometry import _norm_epoch, _strip_footnote, _visit_key
 from usdm4_assure.extract.soa.grid import SoAGrid
 
 _PROMPT_FILE = Path(__file__).resolve().parents[2] / "llm" / "prompts" / "soa_vision_page.md"
@@ -74,9 +74,9 @@ def _parse(raw: str, page: int) -> PageReading | None:
         marks = sorted({m for m in marks if isinstance(m, int) and 0 <= m < n})
         rows.append({"activity": str(r["activity"]).strip(), "group": bool(r.get("group")),
                      "marks": marks})
-    if not columns or not rows:
+    if not columns:
         return None
-    return PageReading(page, columns, rows)
+    return PageReading(page, columns, rows)      # no rows: a footnote-only continuation page
 
 
 def _render(doc, page: int) -> tuple[str, str]:
@@ -135,6 +135,15 @@ def read_pages(pdf_path: str | Path, pages: list[int], llm) -> tuple[list[PageRe
     return readings, report
 
 
+def _column_name(col: dict) -> str:
+    """The visit name in the same shape the geometry reader gives, so the two readers compare:
+    a numbered visit is "Visit 1a"; otherwise the printed label without footnote letters."""
+    number = _strip_footnote(str(col.get("visit_number") or ""))
+    if re.fullmatch(r"\d+[a-z]?", number):
+        return f"Visit {number}"
+    return _strip_footnote(str(col.get("visit") or ""))
+
+
 def stitch(readings: list[PageReading]) -> SoAGrid | None:
     """One grid from the page readings, in page order."""
     visits: list[str] = []
@@ -148,7 +157,7 @@ def stitch(readings: list[PageReading]) -> SoAGrid | None:
         where: list[int] = []
         seen_here: dict[str, int] = {}
         for col in reading.columns:
-            name = str(col.get("visit") or "").strip()
+            name = _column_name(col)
             base = _visit_key(name) or "col"
             seen_here[base] = seen_here.get(base, 0) + 1
             key = f"{base}#{seen_here[base]}"   # two "Day 1" columns on a page stay two visits
@@ -157,7 +166,7 @@ def stitch(readings: list[PageReading]) -> SoAGrid | None:
                 visits.append(name or f"V{len(visits) + 1}")
                 window = str(col.get("window") or "").strip()
                 timings.append(f"{name} {window}".strip())
-                epochs.append(str(col.get("epoch") or "").strip())
+                epochs.append(_norm_epoch(_strip_footnote(str(col.get("epoch") or ""))))
             where.append(visit_at[key])
         for row in reading.rows:
             key = re.sub(r"\W+", "", row["activity"].lower())
