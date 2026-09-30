@@ -115,3 +115,39 @@ See [References](references.md) and [`docs/ai/archive/PLAN-v0.3-evidence-and-roa
 All three pins — `usdm4` package version, CORE rule-set version, and errata revision — are
 recorded together in [`../PINS.md`](../PINS.md), so a version bump is a visible, deliberate
 decision rather than silent drift.
+
+## d4k triage on real protocols (PLAN.md task C-11, 2026-09-30)
+
+Every d4k failure on the five train studies, classified per instance with
+`spikes/_d4k_triage.py` (rule text, class, attribute, message and path for each finding),
+not from the failing-rules list alone. The fixture-based section above predates real data:
+seven rules that never fired on the fixture fired on real protocols.
+
+**Before: 12 failing rules. After the fixes below: 8, none of them our bug.** Train-set
+accuracy was unaffected (43.1% -> 43.3%).
+
+### Our bugs — fixed
+
+| Rule | Level | Cause | Fix |
+|---|---|---|---|
+| `DDF00172` | Error | The compound code (C-6) was a second sponsor-scoped `StudyIdentifier` | Moved to usdm4's own compound-codes channel (`identification.other.compound_codes` -> StudyVersion extension `004`); the rubric reads it there |
+| `DDF00140`/`DDF00200` (2 of 7 instances) | Error | The PIP number was scoped to usdm4's generic `other` organisation, type Unknown | Scoped to EMA (a PIP number is an EMA decision number) |
+| `DDF00247` | Warning | Criteria text with raw `<`/`&` ("ANC <1500/mm3", "pericardial & peritoneal") is not XHTML | Escaped once in the sanitizer for criteria, objectives and endpoints |
+| `DDF00213` | Warning | The assured intervention model never replaced the regex one, so a single-arm sub-study was delivered as "Parallel Study" | `extract/domains.py` now propagates it, as it already did for arms |
+| `DDF00088` | Warning | A later table's own visit (a PK timepoint) was appended after follow-up, so epochs ran Treatment -> Follow-up -> Treatment | Placed after the last earlier visit of its epoch |
+
+### Not our bugs — each with its reason
+
+| Rule | Level | Studies | Classification | Why |
+|---|---|---:|---|---|
+| `DDF00031` | Error | 5/5 | **Rule-library bug** | Compares `Timing.type.decode` to `"Fixed Reference"`; the assembler's decode is `"Fixed Reference Timing Type"` (see above). |
+| `DDF00084` | Error | 3/5 | **Rule vs protocol** | "Exactly one primary objective" — these protocols state 2-4 (efficacy, safety, immunogenicity; Phase 1b and Phase 2). The reference has the same count. Demoting a real primary objective would misstate the protocol. |
+| `DDF00241` | Error | 5/5 | **Model limitation** | "18 years or older" has no maximum. USDM's `Range.maxValue` is required, DDF00097 requires a planned age range, and usdm4's assembler fills the missing maximum with the minimum — which its own DDF00241 then rejects. The only way to pass is to invent an upper age; not done. |
+| `DDF00140`/`DDF00200` | Error | 5/5 (sponsor only) | **Data gap** | The sponsor's organisation type is not stated in the protocol; recorded as CDISC `Unknown`, which the codelist does not contain. The reference's "Drug Company" is domain knowledge, not protocol text. |
+| `DDF00101` | Warning | 5/5 | **Upstream** | Needs procedures referencing interventions; the assembler does not wire them. |
+| `DDF00075` | Warning | 5/5 | **Deliberate gap** | Biomedical-concept coding would mint placeholder LOINC codes (see above). |
+| `DDF00174` | Warning | 2/5 | **Correct as is** | EMA holds both the EU CT and the PIP number — both are EMA-issued; the reference is identical. |
+
+Remaining **errors** are therefore one rule-library bug, one protocol-vs-rule conflict, one
+USDM model limitation and one data gap. CORE (C-12) has not been run: it needs
+`CDISC_LIBRARY_API_KEY`, which is not configured.

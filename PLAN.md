@@ -116,10 +116,10 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 ### CP-F · Opus / high · Assurance on real data (M4)
 | ID | Task | Done when |
 |---|---|---|
-| C-10 | Calibrate confidence on gold; conformal threshold decides auto-accept vs review | risk-coverage curve on held-out |
-| C-11 | Triage d4k rules failing on real studies (DDF00213, DDF00247 and others) | each failure classed as our bug, rule bug or data issue |
-| C-12 | Real CORE run with the CDISC key; compare with d4k | `docs/conformance.md` updated |
-| C-13 | Pin `cdisc-rules-engine` exactly in `PINS.md` | pin recorded |
+| C-10 | Calibrate confidence on gold; conformal threshold decides auto-accept vs review. **Blocked on Q-4 (audited gold, decision D1)** | risk-coverage curve on held-out |
+| C-11 | ~~Triage d4k rules on real studies~~ **done**: 12 failing rules -> 8; five were our bugs (fixed), the rest classified in `docs/conformance.md` | each failure classed as our bug, rule bug or data issue |
+| C-12 | Real CORE run with the CDISC key; compare with d4k. **Blocked: `CDISC_LIBRARY_API_KEY` not set** | `docs/conformance.md` updated |
+| C-13 | ~~Pin `cdisc-rules-engine`~~ **done**: `==0.17.1` | pin recorded |
 
 Order: **CP-A → CP-C (Q-1, Q-2, Q-4 start now, it is the long pole) → CP-D → CP-E → CP-F**, with CP-B slotted
 in whenever the backend is needed by the frontend team.

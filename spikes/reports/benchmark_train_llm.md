@@ -1,22 +1,22 @@
 # Benchmark - LLM readers on
 
-Studies: 5 | reference items 976 | matched 592 | spurious 397
+Studies: 5 | reference items 976 | matched 593 | spurious 394
 
-**Accuracy (matched / (reference + spurious)): 43.1%**  |  recall 60.7%
+**Accuracy (matched / (reference + spurious)): 43.3%**  |  recall 60.8%
 
 | Study | Accuracy | Recall | Matched | Reference | Spurious | Seconds |
 |---|---:|---:|---:|---:|---:|---:|
-| C5091017 | 74.4% | 92.0% | 241 | 262 | 62 | 51 |
-| C4601003 | 52.1% | 67.6% | 100 | 148 | 44 | 64 |
+| C5091017 | 74.6% | 92.0% | 241 | 262 | 61 | 51 |
+| C4601003 | 52.4% | 67.6% | 100 | 148 | 43 | 60 |
 | C4891001 | 31.4% | 59.2% | 103 | 174 | 154 | 47 |
-| C4891002 | 21.8% | 30.4% | 66 | 217 | 86 | 64 |
-| C4891006 | 36.3% | 46.9% | 82 | 175 | 51 | 62 |
+| C4891002 | 21.8% | 30.4% | 66 | 217 | 86 | 70 |
+| C4891006 | 36.9% | 47.4% | 83 | 175 | 50 | 58 |
 
 ## By category (all studies pooled)
 
 | Category | Matched | Reference | Delivered | Recall |
 |---|---:|---:|---:|---:|
-| scalars | 32 | 34 | 34 | 94% |
+| scalars | 33 | 34 | 34 | 97% |
 | identifiers | 20 | 23 | 27 | 87% |
 | arms | 8 | 9 | 9 | 89% |
 | interventions | 7 | 12 | 9 | 58% |
@@ -28,4 +28,4 @@ Studies: 5 | reference items 976 | matched 592 | spurious 397
 | encounters | 38 | 60 | 50 | 63% |
 | activities | 165 | 245 | 180 | 67% |
 | marks | 142 | 290 | 365 | 49% |
-| vendors | 0 | 34 | 7 | 0% |
+| vendors | 0 | 34 | 5 | 0% |
