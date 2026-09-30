@@ -187,3 +187,33 @@ is not in the source. The specific-name portion would need narrative-wide entity
 with a high false-positive risk (any proper noun could be mistaken for a vendor) for a
 small, unpredictable yield. Deferred pending the audited gold set (Q-4), which should say
 whether "vendors" in the gold standard is meant to be grounded in the protocol PDF at all.
+
+## Objectives/endpoints reader (C-5): a reference-paraphrase finding
+
+Checked every endpoint miss on 3 studies against the actual protocol table
+(`spikes/_obj_bestmatch.py`, `spikes/_obj_diff.py`), cell by cell:
+
+- **C5091017** (the study the readers were built against): 10 of 11 reference endpoints
+  match at 0.5-1.0 Jaccard. The extraction is correctly reading the Objectives/Endpoints/
+  Estimands table.
+- **C4601003 and C4891001** (unseen during development): most misses are the *same*
+  endpoint, worded differently — verified against the source PDF cell by cell:
+  - C4601003: our endpoint is the table's own **Endpoints** column text verbatim
+    ("Clinically- and laboratory-confirmed Lyme disease..."); the reference's endpoint text
+    ("Incidence of clinically- and laboratory-confirmed Lyme disease...", "Proportion of
+    participants reporting...") is closer to the table's separate **Estimands** column,
+    which states the measurable statistic. The reference appears to synthesise endpoint +
+    estimand, not transcribe the Endpoints column.
+  - C4891001: the protocol's own Endpoints column reads "**QTc**" — nothing more; the
+    reference's endpoint ("QTc interval (e.g., QTcF) as measured by triplicate ECGs...")
+    is pulled from a different section of the protocol (a QTc sub-study), not the table.
+    Same pattern for "OR" (the protocol's own abbreviation) vs the reference's expansion
+    "Objective Response Rate (ORR)".
+
+**No mechanical extraction bug was found in the cases checked** — the reader faithfully
+transcribes the source table. The gap on unseen studies is the reference enriching or
+correcting the table text with information the extractor cannot see without leaving the
+grounding contract (a verbatim quote, never an inferred or synthesised one). This is the
+same shape of finding as vendors above: it caps what a *grounded* score can show, and
+only the audited gold set (Q-4) can say whether "endpoint" should mean the table's own
+text or the reference's synthesised metric statement.
