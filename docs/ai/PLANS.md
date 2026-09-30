@@ -3,8 +3,8 @@ Format: ID | title | tracker | plan file
 Tracker = the Trello card (one card per ID). Detail lives in PLAN.md section 5, not here.
 
 ## Now (max 3)
-H-4 | Push dev to the backend repo (origin set) | Trello | PLAN.md CP-A
 Q-4 | Audited gold for train and held-out studies (needs owner, decision D1) | Trello | PLAN.md CP-C
+C-9 | OCR fallback for scanned pages | Trello | PLAN.md CP-E
 
 ## Next (max 7)
 C-1 | SoA layouts still failing | Trello | PLAN.md CP-D

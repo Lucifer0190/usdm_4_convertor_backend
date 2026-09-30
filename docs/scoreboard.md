@@ -147,3 +147,43 @@ marks are mostly wrong, and disagreement does not flag geometry's errors well.
 marks). Vision is the fallback when no ruled table is found (tables without rules, scans, unfamiliar
 layouts), with every mark routed to review. Docling / Granite-Docling were not run: on ruled Pfizer
 tables the geometry reader already reads the exact grid, so they would compete only for the fallback.
+
+## Identifiers reader (C-6), 2026-09-30
+
+Deterministic title-page label parser (`extract/identifiers.py`): NCT, EU CT / EudraCT, US
+IND, PIP and compound codes, alongside C1 metadata's protocol number. Train set, deterministic:
+
+| | Before | After |
+|---|---:|---:|
+| identifiers recall | 17% (4/23) | **78% (18/23)** |
+| overall accuracy | 39.9% | 40.9% |
+| overall recall | 56.4% | 57.8% |
+
+Per study: C5091017 5/6, C4891001 4/4, C4891002 4/4, C4891006 4/5, C4601003 1/4. The one
+weak study's reference labels its own values ("EudraCT Number: 2021-005427-20" instead of
+the bare number) inconsistently with the other four references (bare "2021-005427-20"
+style) — the identifier rubric matches at an exact 1.0 threshold, so this is a reference
+formatting inconsistency, not an extraction gap; the audited gold set (Q-4) should settle it.
+
+## Vendors: a groundability finding, not yet an extractor (C-6)
+
+Checked whether the reference's "vendors" (organisations other than the sponsor) are
+literally present in the protocol text they are supposedly extracted from, across the 3
+studies with the most vendor items (`spikes/_vendor_probe.py`). Result is split:
+
+- **Generic role-based names never appear**: "Central Laboratory", "Central Imaging
+  Vendor", "Central ECG Vendor", "IRT/RTSM System", "eCOA/ePRO Vendor" — 0 occurrences in
+  C4891006's full text (all pages, exact and case-insensitive). These look like standard
+  knowledge the reference's annotator added, not text extracted from this document.
+- **Specific named vendors sometimes do appear**, but scattered deep in narrative
+  procedure text with no predictable location: C4601003 names LabCorp and the Karius Test
+  in sections 4.2.5.3 and 8.3.3.2 (a lab-testing methodology paragraph), not a vendor list.
+  "Florence" (an eISF/document-transfer platform) appears in a data-security sentence in
+  every study checked, not as a named organisation in a table.
+
+Given our grounding rule (every value must resolve to a verbatim quote, never inferred),
+the generic-name portion of this category cannot be filled without fabricating text that
+is not in the source. The specific-name portion would need narrative-wide entity spotting
+with a high false-positive risk (any proper noun could be mistaken for a vendor) for a
+small, unpredictable yield. Deferred pending the audited gold set (Q-4), which should say
+whether "vendors" in the gold standard is meant to be grounded in the protocol PDF at all.
