@@ -57,6 +57,41 @@ def arms_from_names(value: str) -> list[dict]:
     return out
 
 
+# A bulleted/enumerated arm ("•   Arm A: (Investigational Arm; n ~ 280).", " Dose
+# Level 1 (n ~ 25)."). Each bullet is its own sentence, sometimes with a running
+# header/footer interleaved before the next one — the comma/period-bounded
+# ``_parse_arms`` below only ever captures the first such bullet as a result.
+_ARM_LABEL = re.compile(
+    r"[•●■]\s*((?:Arm|Cohort|Dose\s+Level|Group|Part)\s+[A-Za-z0-9]+)\s*[:(]",
+    re.IGNORECASE)
+
+
+_ARM_KIND = re.compile(r"(Arm|Cohort|Dose\s+Level|Group|Part)", re.IGNORECASE)
+
+
+def _bulleted_arms(text: str) -> tuple[list[dict], str]:
+    """Arms named by an explicit bulleted label, wherever they appear in the text.
+
+    A protocol can enumerate more than one thing this way (a dose-escalation "Dose
+    Level 1/2" block, then a separate randomized-comparison "Arm A/B" block later) — only
+    the first such family found is taken, so the two are never merged into one arm list.
+    Requires at least 2 distinct labels, so one incidental "Part A" heading is not
+    mistaken for the arm list.
+    """
+    seen, arms, kind = set(), [], None
+    for m in _ARM_LABEL.finditer(text):
+        name = re.sub(r"\s+", " ", m.group(1)).strip()
+        this_kind = _ARM_KIND.match(name).group(1).lower()
+        if kind is None:
+            kind = this_kind
+        elif this_kind != kind:
+            continue
+        if arm_name_ok(name) and name.lower() not in seen:
+            seen.add(name.lower())
+            arms.append({"name": name, "type": _arm_type(name)})
+    return (arms, "bulleted arm list") if len(arms) >= 2 else ([], "")
+
+
 def _parse_arms(text: str) -> tuple[list[dict], str]:
     """Find the arm enumeration and split into arms.
 
@@ -119,7 +154,9 @@ def extract_design(doc: Document, metadata_vals: dict, llm: LLM) -> tuple[
                                     "design-heuristic", mm.group(0), 1))
 
     # arms
-    arms, src = _parse_arms(text)
+    arms, src = _bulleted_arms(text)
+    if not arms:
+        arms, src = _parse_arms(text)
     de.arms, de.arms_source = arms, src
     if arms:
         # confidence: multiple arms cleanly parsed from an explicit ratio => higher

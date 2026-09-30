@@ -148,9 +148,15 @@ def view_of(wrapper: dict) -> dict:
                if o.get("name") and _decode(o.get("type")).lower() not in _REGULATORY_ORGS | _SPONSOR_ORGS]
     return {
         "scalars": {k: v for k, v in scalars.items() if v},
-        "identifiers": ids, "arms": [a.get("name") for a in design.get("arms", []) if a.get("name")],
-        "interventions": [i.get("name") for i in (version.get("studyInterventions")
-                                                  or design.get("studyInterventions") or []) if i.get("name")],
+        # Arms/interventions: usdm4's assembler always sets `name` to a slugified,
+        # upper-cased form (`StudyArm.name = _label_to_name(label)`, e.g. "Ibuzatrelvir" ->
+        # "IBUZATRELVIR") and puts the extracted text verbatim in `label`, exactly the
+        # machine-name/label split `_display()` already exists for; using `.get("name")`
+        # here compared the reference's readable text against usdm4's own generated slug.
+        "identifiers": ids, "arms": [_display(a) for a in design.get("arms", []) if _display(a)],
+        "interventions": [_display(i) for i in (version.get("studyInterventions")
+                                                or design.get("studyInterventions") or [])
+                          if _display(i)],
         "criteria": criteria, "objectives": objectives, "endpoints": endpoints,
         "estimands": [estimand_text(e) for e in design.get("estimands", [])],
         "epochs": [_display(e) for e in design.get("epochs", []) if _display(e)],
