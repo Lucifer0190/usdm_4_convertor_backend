@@ -78,3 +78,10 @@ def test_score_grid_uses_the_soa_categories_only():
     s = score_grid(g, ref)
     assert set(s.categories) <= {"epochs", "encounters", "activities", "marks"}
     assert s.matched == 3
+
+
+def test_a_continuation_page_is_told_the_columns_already_found():
+    from usdm4_assure.extract.soa.vision_table import _known_columns
+    assert _known_columns([]) == ""
+    text = _known_columns([PageReading(1, [{"visit": "Week 8"}, {"visit": "ET"}], [])])
+    assert "0. Week 8" in text and "1. ET" in text and "exactly these names" in text

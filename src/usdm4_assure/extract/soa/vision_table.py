@@ -24,7 +24,7 @@ from usdm4_assure.extract.soa.grid import SoAGrid
 
 _PROMPT_FILE = Path(__file__).resolve().parents[2] / "llm" / "prompts" / "soa_vision_page.md"
 _MAX_PAGE_TEXT = 6000
-_MAX_TOKENS = 8000
+_MAX_TOKENS = 24000           # reasoning models spend part of the budget before answering
 _ZOOM = 2.0                    # ~144 dpi: small rotated header text stays legible
 
 
@@ -88,6 +88,17 @@ def _render(doc, page: int) -> tuple[str, str]:
     return base64.b64encode(png).decode("ascii"), p.get_text()
 
 
+def _known_columns(readings: list[PageReading]) -> str:
+    """Columns found on the table's earlier pages, so a continuation page reuses their names."""
+    if not readings:
+        return ""
+    names = [str(c.get("visit") or "") for c in readings[-1].columns]
+    listed = "\n".join(f"{i}. {n}" for i, n in enumerate(names))
+    return ("Visit columns already found on the previous page of this table, left to right:\n"
+            f"{listed}\nIf this page continues the same table, report exactly these columns with "
+            "exactly these names, in this order. If it is a different table, read its own header.")
+
+
 def read_pages(pdf_path: str | Path, pages: list[int], llm) -> tuple[list[PageReading], VisionReport]:
     """Ask the vision model for each page; keep the readings that validate."""
     import pymupdf
@@ -101,7 +112,8 @@ def read_pages(pdf_path: str | Path, pages: list[int], llm) -> tuple[list[PageRe
             if not 1 <= page <= doc.page_count:
                 continue
             image, text = _render(doc, page)
-            prompt = template.replace("{page_text}", text[:_MAX_PAGE_TEXT])
+            prompt = (template.replace("{known_columns}", _known_columns(readings))
+                      .replace("{page_text}", text[:_MAX_PAGE_TEXT]))
             report.pages.append(page)
             try:
                 raw = llm.complete_vision(image, prompt, max_tokens=_MAX_TOKENS)

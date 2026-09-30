@@ -31,6 +31,8 @@ Rules:
 - Drop footnote letters and asterisks from labels ("EOT a" -> "EOT").
 - If the page holds no Schedule of Activities table, return {"is_schedule": false, "columns": [], "rows": []}.
 
+{known_columns}
+
 Text layer of this page:
 <<<
 {page_text}

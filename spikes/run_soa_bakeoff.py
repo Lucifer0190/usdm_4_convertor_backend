@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / "spikes"))
 from run_benchmark import find_protocol, find_reference
 
 from usdm4_assure.eval.rubric import SOA_CATEGORIES, score_grid, view_of
-from usdm4_assure.eval.split import HeldOutGuard, studies_for
+from usdm4_assure.eval.split import HeldOutGuard, check_explicit, studies_for
 
 
 def schedule_pages(pdf: Path) -> list[int]:
@@ -46,11 +46,13 @@ def main() -> int:
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--set", dest="which", default="train", choices=["train", "heldout", "all"])
     ap.add_argument("--confirm-heldout", action="store_true")
+    ap.add_argument("--studies", nargs="*", help="explicit study ids (overrides --set)")
     ap.add_argument("--readers", nargs="+", default=["geometry", "vision"])
     ap.add_argument("--max-pages", type=int, default=12, help="cap on pages sent to vision")
     args = ap.parse_args()
     try:
-        studies = studies_for(args.which, confirm_heldout=args.confirm_heldout)
+        studies = (check_explicit(args.studies, confirm_heldout=args.confirm_heldout)
+                   if args.studies else studies_for(args.which, confirm_heldout=args.confirm_heldout))
     except HeldOutGuard as exc:
         print(f"refused: {exc}")
         return 2
