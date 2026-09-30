@@ -21,30 +21,36 @@ from usdm4_assure.extract.soa.grid import AssuredGrid
 from usdm4_assure.validate.gate import validate_wrapper
 
 # scope.standard keys usdm4's IdentificationAssembler recognises (STANDARD_ORGS); each
-# maps a C6-extracted registry/regulatory field to the org usdm4 builds for it.
-_STANDARD_SCOPE = {"nct": "nct", "euCt": "ema", "eudract": "ema", "ind": "fda-ind", "pip": "other"}
+# maps a C6-extracted registry/regulatory field to the org usdm4 builds for it. A PIP
+# number is an EMA decision number, so it is scoped to EMA like the EU CT number: that
+# costs a DDF00174 *warning* (EMA holds two identifiers), where the generic "other"
+# scope built an organisation of type "Unknown" and failed DDF00140/DDF00200 (errors).
+_STANDARD_SCOPE = {"nct": "nct", "euCt": "ema", "eudract": "ema", "ind": "fda-ind", "pip": "ema"}
 
 
-def _extra_identifiers(identifiers: dict[str, str | None], sponsor_name: str | None) -> list[dict]:
-    """Registry/regulatory/compound ``StudyIdentifier`` entries (task C-6), beyond the
-    sponsor protocol identifier every study always carries at index 0.
+def _extra_identifiers(identifiers: dict[str, str | None]) -> list[dict]:
+    """Registry/regulatory ``StudyIdentifier`` entries (task C-6), beyond the sponsor
+    protocol identifier every study always carries at index 0.
 
-    A compound code has no registry of its own; scoping it to the sponsor organisation
-    (by name, matching index 0) makes usdm4's identification assembler attach it to that
-    same ``Organization`` instead of minting a second one for it.
+    The compound code is deliberately *not* one of them: a second identifier scoped to
+    the sponsor fails DDF00172 ("exactly one sponsor study identifier", an error). usdm4
+    has a dedicated channel for it instead — see :func:`_compound_codes`.
     """
     out: list[dict] = []
     for field, standard in _STANDARD_SCOPE.items():
         value = identifiers.get(field)
         if value:
             out.append({"identifier": value, "scope": {"standard": standard}})
-    compound = identifiers.get("compound")
-    if compound:
-        for code in dict.fromkeys(c.strip() for c in compound.split(",") if c.strip()):
-            out.append({"identifier": code, "scope": {"non_standard": {
-                "type": "unknown", "role": "sponsor",
-                "name": sponsor_name or "", "label": sponsor_name or ""}}})
     return out
+
+
+def _compound_codes(identifiers: dict[str, str | None]) -> str | None:
+    """``identification.other.compound_codes``: usdm4 writes it as the StudyVersion's
+    compound-codes extension (``CC_EXT_URL``), the model's own place for PF-codes."""
+    compound = identifiers.get("compound")
+    if not compound:
+        return None
+    return ", ".join(dict.fromkeys(c.strip() for c in compound.split(",") if c.strip()))
 
 
 def _interventions_from_arms(design: DesignExtract) -> tuple[list[dict], dict]:
@@ -101,7 +107,8 @@ def _assembler_input(meta: dict, design: DesignExtract, ag: AssuredGrid,
                  "scope": {"non_standard": {"type": None, "role": "sponsor",
                                             "name": meta.get("sponsorName"),
                                             "label": meta.get("sponsorName")}}}
-            ] + _extra_identifiers(identifiers or {}, meta.get("sponsorName")),
+            ] + _extra_identifiers(identifiers or {}),
+            "other": {"compound_codes": _compound_codes(identifiers or {})},
         },
         "document": {
             "document": {"label": "Protocol", "version": version, "status": "final",

@@ -28,6 +28,7 @@ the reference itself is incomplete.
 """
 from __future__ import annotations
 
+import html
 import re
 from dataclasses import dataclass, field
 
@@ -35,11 +36,13 @@ _STOP = frozenset({"the", "and", "for", "with", "that", "this", "are", "was", "w
                    "from", "has", "have", "not", "any", "all", "who", "their", "than"})
 _REGULATORY_ORGS = {"study registry", "regulatory agency"}
 _SPONSOR_ORGS = {"drug company", "pharmaceutical company", "sponsor"}
+_COMPOUND_CODES_EXT = "www.d4k.dk/usdm/extensions/004"    # usdm4 CC_EXT_URL
 
 
 # --- text helpers ------------------------------------------------------------------- #
 def _norm(text: str | None) -> str:
-    t = (text or "").replace("â€‘", "-").replace("‑", "-").replace("−", "-").lower()
+    t = html.unescape(text or "")          # USDM text is XHTML: "&lt;1500" reads as "<1500"
+    t = (t or "").replace("â€‘", "-").replace("‑", "-").replace("−", "-").lower()
     t = re.sub(r"(?<![a-z0-9])-(?=\d)", " neg", t)       # "Day -1" must differ from "Day 1"
     return re.sub(r"[^a-z0-9 ]+", " ", t)
 
@@ -80,6 +83,13 @@ def view_of(wrapper: dict) -> dict:
     design = (version.get("studyDesigns") or [{}])[0]
 
     ids = [i.get("text") for i in version.get("studyIdentifiers", []) if i.get("text")]
+    # Compound codes: a reference may carry them as a sponsor-scoped StudyIdentifier (which
+    # fails DDF00172, "exactly one sponsor identifier"); usdm4's own channel is the
+    # StudyVersion compound-codes extension. Either way it is the same extracted value.
+    for ext in version.get("extensionAttributes", []) or []:
+        if ext.get("url") == _COMPOUND_CODES_EXT and ext.get("valueString"):
+            ids += [c.strip() for c in ext["valueString"].split(",")
+                    if c.strip() and c.strip() not in ids]
     protocol_id = next((i for i in ids if re.fullmatch(r"[A-Za-z]\d{7}", i)), None)
     titles = version.get("titles", [])
     official = next((t["text"] for t in titles if "official" in _decode(t.get("type")).lower()),

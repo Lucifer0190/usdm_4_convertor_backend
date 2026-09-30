@@ -76,3 +76,32 @@ def test_parse_arms_unaffected_by_the_new_path():
     arms, src = _parse_arms("Subjects are randomized 2:1 to groups: Drug, or Placebo.")
     assert _names(arms) == ["Drug", "Placebo"]
     assert src.startswith("groups:")
+
+
+def test_normalize_model_maps_every_spelling_to_the_canonical_label():
+    from usdm4_assure.extract.design import normalize_model
+    assert normalize_model("Single-group") == "Single Group"
+    assert normalize_model("single group design") == "Single Group"
+    assert normalize_model("Parallel") == "Parallel"
+    assert normalize_model("cross-over") == "Crossover"
+    assert normalize_model("Adaptive") == "Adaptive"          # unknown: left for usdm4 to report
+
+
+def test_the_assured_intervention_model_replaces_the_regex_one(monkeypatch):
+    """The design text says 'parallel' (the regex's pick), but the Assurance layer settled
+    on single group: the assured value must be what reaches the assembler."""
+    from usdm4_assure.contracts import AssuredField, Decision
+    from usdm4_assure.extract import domains
+
+    doc = Document(source=None, blocks=[],
+                   full_text="A single-arm sub-study; sites enroll in parallel.")
+    assured = [AssuredField(field="interventionModel", value="Single-group", candidates=[],
+                            methods_agree=True, n_methods=2, verifier="supported",
+                            confidence=0.9, decision=Decision.AUTO_ACCEPT, domain="design")]
+    monkeypatch.setattr(domains, "assure", lambda *a, **k: assured)
+
+    class _Member:
+        available = False
+
+    res = domains.extract_domain("design", doc, [_Member()], {})
+    assert res.extract.intervention_model == "Single Group"

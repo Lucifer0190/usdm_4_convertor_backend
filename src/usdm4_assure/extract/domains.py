@@ -109,6 +109,12 @@ def extract_domain(domain: str, doc: Document, members: Sequence[LLM],
         cands, extract = c2.extract_design(doc, meta or {}, members[0])
         cands = cands + _grounded(c2, doc, escalate)
         assured = assure(cands, doc, c2.DESIGN_FIELDS, domain=domain)
+        # The assured intervention model replaces the regex one, as the arm list does
+        # below: otherwise the first "parallel" anywhere in the design text decided it
+        # (a single-arm sub-study was delivered as "Parallel Study", failing DDF00213).
+        model = next((f for f in assured if f.field == "interventionModel"), None)
+        if model is not None and model.value:
+            extract.intervention_model = c2.normalize_model(model.value)
         arms = next((f for f in assured if f.field == "armNames"), None)
         if arms is not None and arms.value:
             parsed = c2.arms_from_names(arms.value)

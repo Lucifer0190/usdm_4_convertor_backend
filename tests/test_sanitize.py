@@ -241,3 +241,20 @@ def test_nothing_extracted_at_all_still_assembles(grid):
     assert sv["organizations"][0]["name"] == "[not extracted]"
     assert {"studyTitle", "sponsorName", "protocolIdentifier"} <= _fields(
         findings, Severity.ERROR)
+
+
+def test_syntax_template_text_is_xml_escaped_for_ddf00247(grid):
+    raw = _raw(grid, elig=EligibilityExtract(inclusion=["ANC <1500/mm3 & platelets >100."],
+                                             exclusion=["Pregnancy."], age_min=18, age_max=75),
+               objs=ObjectivesExtract(items=[ObjectivePair("Evaluate RNA <LLOQ.",
+                                                           "Time to RNA <LLOQ.", "Primary")]))
+    clean, findings = sanitize(raw)
+    assert clean["population"]["inclusion_exclusion"]["inclusion"] == [
+        "ANC &lt;1500/mm3 &amp; platelets &gt;100."]
+    obj = clean["objectives"]["objectives"][0]
+    assert obj["text"] == "Evaluate RNA &lt;LLOQ." and obj["endpoints"][0]["text"] == \
+        "Time to RNA &lt;LLOQ."
+    assert any("DDF00247" in f.message for f in findings)
+    out = assemble(clean)
+    from usdm4_assure.validate.gate import validate_wrapper
+    assert "DDF00247" not in validate_wrapper(out.wrapper)["d4k"]["failed_rules"]

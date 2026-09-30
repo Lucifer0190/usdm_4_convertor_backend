@@ -89,24 +89,27 @@ def test_fields_list_matches_the_labels():
 
 # --- assembly: the extra identifiers actually reach the delivered USDM ------------------ #
 def test_extracted_identifiers_become_extra_study_identifiers():
-    from usdm4_assure.assemble.study import _extra_identifiers
+    from usdm4_assure.assemble.study import _compound_codes, _extra_identifiers
 
-    extra = _extra_identifiers(
-        {"nct": "NCT05548127", "euCt": "2022-502228-34-00", "ind": "162074",
-         "compound": "PF-07850327, PF-07850327"}, sponsor_name="Pfizer Inc.")
-    by_field = {(e["identifier"]): e["scope"] for e in extra}
-    assert by_field["NCT05548127"] == {"standard": "nct"}
-    assert by_field["2022-502228-34-00"] == {"standard": "ema"}
-    assert by_field["162074"] == {"standard": "fda-ind"}
-    assert by_field["PF-07850327"]["non_standard"]["name"] == "Pfizer Inc."
-    assert len(extra) == 4                                    # duplicate compound deduped
+    ids = {"nct": "NCT05548127", "euCt": "2022-502228-34-00", "ind": "162074",
+           "pip": "EMA/PE/0000229195", "compound": "PF-07850327, PF-07850327"}
+    by_value = {e["identifier"]: e["scope"] for e in _extra_identifiers(ids)}
+    assert by_value == {"NCT05548127": {"standard": "nct"},
+                        "2022-502228-34-00": {"standard": "ema"},
+                        "162074": {"standard": "fda-ind"},
+                        "EMA/PE/0000229195": {"standard": "ema"}}   # PIP: an EMA number
+    # The compound code is not a StudyIdentifier (a second sponsor-scoped identifier fails
+    # DDF00172); it goes to usdm4's compound-codes channel, de-duplicated.
+    assert "PF-07850327" not in by_value
+    assert _compound_codes(ids) == "PF-07850327"
 
 
 def test_no_identifiers_extracted_means_no_extra_entries():
-    from usdm4_assure.assemble.study import _extra_identifiers
+    from usdm4_assure.assemble.study import _compound_codes, _extra_identifiers
 
-    assert _extra_identifiers({}, sponsor_name="Pfizer Inc.") == []
-    assert _extra_identifiers({"nct": None, "pip": ""}, sponsor_name="Pfizer Inc.") == []
+    assert _extra_identifiers({}) == []
+    assert _extra_identifiers({"nct": None, "pip": ""}) == []
+    assert _compound_codes({}) is None
 
 
 def test_identifiers_flow_through_a_real_assembly():
@@ -145,4 +148,14 @@ def test_identifiers_flow_through_a_real_assembly():
     assert out["ok"], out["assembler_errors"]
     sv = out["wrapper"]["study"]["versions"][0]
     ids = {i["text"] for i in sv["studyIdentifiers"]}
-    assert {"DA-201", "NCT12345678", "2022-500000-11-00", "PF-00000001"} <= ids
+    assert {"DA-201", "NCT12345678", "2022-500000-11-00"} <= ids
+    assert "PF-00000001" not in ids                          # not a second sponsor identifier
+    ext = {e["url"]: e.get("valueString") for e in sv.get("extensionAttributes", [])}
+    assert ext.get("www.d4k.dk/usdm/extensions/004") == "PF-00000001"   # compound codes
+
+    from usdm4_assure.eval.rubric import view_of
+    assert "PF-00000001" in view_of(out["wrapper"])["identifiers"]   # still scored as extracted
+
+    from usdm4_assure.validate.gate import validate_wrapper
+    failed = validate_wrapper(out["wrapper"])["d4k"]["failed_rules"]
+    assert "DDF00172" not in failed and "DDF00174" not in failed

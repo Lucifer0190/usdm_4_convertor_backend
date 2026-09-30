@@ -30,6 +30,7 @@ Every repair reported as a ``SANITIZER`` finding, graded by what the gap means:
 from __future__ import annotations
 
 import copy
+import html
 import re
 from dataclasses import dataclass
 
@@ -277,4 +278,39 @@ def sanitize(data: dict) -> tuple[dict, list[Finding]]:
     _fill_placeholders(clean, findings)
     _fill_required_names(clean, findings)
     _derive_labels(clean, findings)
+    _escape_syntax_template_text(clean, findings)
     return clean, findings
+
+
+def _xhtml(text: str) -> str:
+    return html.escape(text, quote=False)
+
+
+def _escape_syntax_template_text(data: dict, findings: list[Finding]) -> None:
+    """USDM syntax-template text (criteria, objectives, endpoints) is XHTML (DDF00247):
+    a protocol's own "ANC <1500/mm3" or "pericardial & peritoneal" is not, until ``<``,
+    ``>`` and ``&`` are escaped. The characters are unchanged for any reader; only the
+    encoding is."""
+    changed = 0
+    ie = data["population"].get("inclusion_exclusion") or {}
+    for kind in ("inclusion", "exclusion"):
+        items = ie.get(kind) or []
+        for i, c in enumerate(items):
+            if isinstance(c, str):
+                new = _xhtml(c)
+                changed += new != c
+                items[i] = new
+            elif isinstance(c, dict) and isinstance(c.get("text"), str):
+                new = _xhtml(c["text"])
+                changed += new != c["text"]
+                c["text"] = new
+    for obj in (data.get("objectives") or {}).get("objectives", []):
+        for node in [obj, *obj.get("endpoints", [])]:
+            if isinstance(node.get("text"), str):
+                new = _xhtml(node["text"])
+                changed += new != node["text"]
+                node["text"] = new
+    if changed:
+        findings.append(_finding(Severity.INFO, "eligibility", "text",
+                                 f"'<', '>' or '&' XML-escaped in {changed} syntax-template "
+                                 "text(s) so the USDM text is valid XHTML (DDF00247)."))

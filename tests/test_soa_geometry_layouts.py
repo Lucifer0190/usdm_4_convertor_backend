@@ -137,3 +137,26 @@ def test_a_comments_column_is_not_a_visit(tmp_path):
             ["Consent", "X", "", "Must be signed first"], ["Demography", "X", "X", ""]]
     g = read_soa_geometry(_pdf(tmp_path, [lambda p: _table(p, 80, xs, rows)]))
     assert g.visits == ["Prescreening", "Day 1"]
+
+
+def test_a_later_tables_own_visit_is_placed_within_its_epoch_not_after_follow_up(tmp_path):
+    xs = [40, 160, 230, 300, 370]
+    main = [["Protocol Activity", "Screening", "Treatment", "Follow-up"],
+            ["", "Screening", "Cycle 1 Day 1", "FU Visit"],
+            ["Consent", "X", "", ""], ["Labs", "X", "X", "X"]]
+    pk = [["PK Activity", "Treatment", "Treatment", "Notes"],
+          ["", "Cycle 1 Day 1 0 h", "Cycle 3 Day 1 0 h", ""],
+          ["PK sample", "X", "X", ""]]
+    path = _pdf(tmp_path, [lambda p: _table(p, 80, xs, main),
+                           lambda p: _table(p, 80, [40, 160, 230, 300, 470], pk)])
+    g = read_soa_geometry(path)
+    assert g.visits.index("Cycle 3 Day 1 0 h") < g.visits.index("FU Visit")
+    # epochs never return to an earlier period once they move on
+    seen = []
+    for e in g.epochs:
+        if not seen or seen[-1] != e:
+            assert e not in seen
+            seen.append(e)
+    pk_row = g.activities.index("PK sample")
+    marked = {g.visits[v] for a, v in g.cells if a == pk_row}
+    assert marked == {"Cycle 1 Day 1", "Cycle 3 Day 1 0 h"}      # marks follow the reorder

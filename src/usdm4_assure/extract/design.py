@@ -27,6 +27,16 @@ _MODEL_NORM = {"parallel": "Parallel", "crossover": "Crossover",
                "factorial": "Factorial", "sequential": "Sequential"}
 
 
+def normalize_model(value: str) -> str:
+    """"Single-group" / "parallel design" / "Crossover" -> the canonical label, or the
+    value unchanged when it names no known model (usdm4's encoder then reports it)."""
+    m = _MODEL_RE.search(value or "")
+    if not m:
+        return value
+    key = m.group(1).lower()
+    return _MODEL_NORM.get(key, _MODEL_NORM.get(key.replace("-", " "), m.group(1).title()))
+
+
 @dataclass
 class DesignExtract:
     study_type: str = "Interventional"

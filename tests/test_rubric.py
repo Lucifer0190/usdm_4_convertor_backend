@@ -89,3 +89,8 @@ def test_numbers_tell_visits_apart():
     assert _jaccard("Visit 1", "Visit 10") < 0.5
     assert _jaccard("Day -1", "Day 1") < 0.5
     assert _jaccard("Cycle 1 Day 1", "Cycle 1 Day 1") == 1.0
+
+
+def test_xhtml_escaped_text_compares_as_the_plain_text():
+    from usdm4_assure.eval.rubric import _jaccard
+    assert _jaccard("ANC &lt;1500/mm3 &amp; platelets", "ANC <1500/mm3 & platelets") == 1.0

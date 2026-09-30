@@ -623,7 +623,8 @@ def read_soa_geometry(pdf_path: str | Path, pages: list[int] | None = None) -> S
     index_of: dict[str, int] = {}
     cells: set[tuple[int, int]] = set()
     visit_at: dict[str, int] = {}
-    for group in groups:
+    order: list[float] = []              # final position of each visit (see below)
+    for gi, group in enumerate(groups):
         parsed = _parse_table_pages(group)
         group_start = len(visits)
         where: list[int] = []            # this table's visit column -> index in the result
@@ -634,6 +635,7 @@ def read_soa_geometry(pdf_path: str | Path, pages: list[int] | None = None) -> S
                 continue
             visit_at.setdefault(key, len(visits))
             where.append(len(visits))
+            order.append(_position(order, epochs[:group_start], epoch, len(visits), gi))
             visits.append(name)
             timings.append(timing)
             epochs.append(epoch)
@@ -646,8 +648,25 @@ def read_soa_geometry(pdf_path: str | Path, pages: list[int] | None = None) -> S
                 cells.add((index_of[key], where[vi]))
     if not visits or not activities:
         return None
-    return SoAGrid(method="geometry", epochs=epochs, visits=visits, timings=timings,
-                   activities=activities, cells=cells)
+    # A later table's own visit (a PK timepoint the main schedule has no column for) sits
+    # after the last earlier visit of its epoch, not after the follow-up visits: appending
+    # it at the end made the epoch sequence run Treatment -> Follow-up -> Treatment again
+    # (DDF00088). One table's own column order is never changed.
+    perm = sorted(range(len(visits)), key=lambda i: order[i])
+    new_at = {old: new for new, old in enumerate(perm)}
+    return SoAGrid(method="geometry", epochs=[epochs[i] for i in perm],
+                   visits=[visits[i] for i in perm], timings=[timings[i] for i in perm],
+                   activities=activities, cells={(a, new_at[v]) for a, v in cells})
+
+
+def _position(order: list[float], earlier_epochs: list[str], epoch: str, index: int,
+              group: int) -> float:
+    """Sort key for a new visit: its own index in the first table; for a later table's
+    visit, just after the last earlier visit of the same epoch (or the end if none)."""
+    if group == 0 or epoch not in earlier_epochs:
+        return float(index)
+    last = max(i for i, e in enumerate(earlier_epochs) if e == epoch)
+    return order[last] + (index + 1) / 1e6       # keeps several such visits in their order
 
 
 def read_first_schedule(pdf_path: str | Path,
