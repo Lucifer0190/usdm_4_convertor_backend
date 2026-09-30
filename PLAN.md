@@ -100,8 +100,8 @@ Track letters: **C** core AI, **B** backend, **Q** quality and evaluation, **H**
 | ID | Task | Done when |
 |---|---|---|
 | C-1 | SoA layouts. **Done so far:** header row roles, continuation pages, notes columns, PK tables, footnotes (visit recall 37->63% train; 204-protocol mark/uniqueness invariants 62/61% -> 89/97%). **Open:** epochs for tables without a period band (vaccine), tables without ruling lines, sub-study schedules | ≥ 85% SoA on train; then measured on held-out |
-| C-2 | **AI SoA reader**: vision model (Gemini 3.1 Pro, cross-checked by Sonnet 5.5) reads the table page images; the geometry reader is the independent check; disagreements go to review | disagreement rate reported |
-| C-3 | **Bake-off** on the same pages: geometry vs vision LLM vs Granite-Docling vs Docling (D3 approved) | one table, one winner per layout type |
+| C-2 | ~~AI SoA reader~~ **done**: `extract/soa/vision_table.py` (Gemini 3.1 Pro page images → JSON, stitched and normalised by code); wired in as the fallback when no ruled table is found, every mark reviewed | disagreement rate reported |
+| C-3 | ~~Bake-off~~ **done** (train): geometry 40.3% vs vision 36.2% pooled SoA; vision-only marks 15% correct, so geometry is delivered and vision is the fallback. Open: rerun vision on held-out and on the 2 protocols with no ruled grid; Docling only if the fallback needs a third option | one table, one winner per layout type |
 | C-4 | Sub-study schedules become separate timelines instead of one merged table | test on a two-schedule protocol |
 
 ### CP-E · Sonnet / medium · The rest of the study (M3)

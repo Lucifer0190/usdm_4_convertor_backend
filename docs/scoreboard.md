@@ -120,3 +120,30 @@ Invariants over all 204 protocol versions, before -> after:
 
 The epoch drop is 27 vaccine-style protocols whose table has a visit-number row and no period band: the
 "epochs" were visit numbers before. Their epochs must come from outside the table (open item under C-1).
+
+## SoA bake-off: geometry vs vision (C-2 / C-3), 2026-09-30
+
+Same schedule pages, SoA categories only (`spikes/run_soa_bakeoff.py`, `eval.rubric.score_grid`).
+Vision = Gemini 3.1 Pro page images + text layer, JSON per page, stitched and normalised by code.
+
+| Study | Geometry | Vision |
+|---|---:|---:|
+| C5091017 | **76.8%** | 67.4% |
+| C4601003 | **80.3%** | 73.3% |
+| C4891001 | **26.7%** | 18.4% (only 12 of 19 pages sent) |
+| C4891002 | 9.0% | 10.1% |
+| C4891006 | 19.5% | 19.5% |
+| **Pooled** | **40.3%** | 36.2% |
+
+Vision improved from 48.6% to 67.4% on C5091017 over three iterations (token budget for reasoning,
+previous page's columns passed to continuation pages, shared name normalisation). Labels are 85–100%
+grounded in the page text.
+
+Does agreement predict a correct mark? On C5091017, the one study whose reference matches the current
+schedule: marks both readers give 76% correct, geometry-only 81%, vision-only 15%. So vision's extra
+marks are mostly wrong, and disagreement does not flag geometry's errors well.
+
+**Decision:** geometry is the delivered SoA on ruled tables; vision is not merged (a union adds false
+marks). Vision is the fallback when no ruled table is found (tables without rules, scans, unfamiliar
+layouts), with every mark routed to review. Docling / Granite-Docling were not run: on ruled Pfizer
+tables the geometry reader already reads the exact grid, so they would compete only for the fallback.

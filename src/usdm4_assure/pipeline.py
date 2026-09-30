@@ -45,6 +45,8 @@ from usdm4_assure.sections.slots import slot_document, slot_windows, strip_furni
 from usdm4_assure.validate.gate import validate_wrapper
 from usdm4_assure.validate.repair import repair_loop
 
+_VISION_MAX_PAGES = 20        # cap on schedule pages sent to the vision fallback (cost)
+
 
 def _sha256_file(path: str | Path) -> str:
     """Hex sha256 of a file's bytes — the audit store's identity for a source PDF."""
@@ -149,6 +151,7 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
         extract_pymupdf,
         extract_pymupdf_stitched,
     )
+    from usdm4_assure.extract.soa.vision_table import read_soa_vision
 
     pdf_path, out_dir = Path(pdf_path), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -212,9 +215,22 @@ def run_full(pdf_path: str | Path, out_dir: str | Path = "data/out_full",
                 "schedules are not yet assembled as separate timelines."))
     else:
         soa_pages = soa_groups[0] if soa_groups else None
-        pymupdf_grid = (extract_pymupdf_stitched(pdf_path, soa_pages)
-                        or extract_pymupdf(pdf_path, soa_pages))
-        grid = cross_validate([extract_pdfplumber(pdf_path, soa_pages), pymupdf_grid])
+        # No ruled table: the vision model reads the page images (bake-off C-3: geometry wins
+        # where rules exist, so vision is the fallback, and every cell it gives is reviewed).
+        vision_grid, vision_report = (read_soa_vision(pdf_path, soa_pages[:_VISION_MAX_PAGES],
+                                                      get_role_llm("vision"))
+                                      if soa_pages else (None, None))
+        if vision_grid is not None:
+            grid = cross_validate([vision_grid])
+            findings.append(Finding(
+                FindingKind.SCOPE, Severity.WARNING, "soa",
+                f"No ruled schedule table was found; the schedule was read by the vision model "
+                f"from pages {vision_report.pages} ({100 * vision_report.grounded_share:.0f}% of "
+                "labels found in the page text). Every mark is routed to review."))
+        else:
+            pymupdf_grid = (extract_pymupdf_stitched(pdf_path, soa_pages)
+                            or extract_pymupdf(pdf_path, soa_pages))
+            grid = cross_validate([extract_pdfplumber(pdf_path, soa_pages), pymupdf_grid])
 
     amendment_diff, amendments_data = None, None
     if previous_version is not None:
