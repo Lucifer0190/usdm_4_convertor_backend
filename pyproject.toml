@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.13"   # SPIKE FINDING: cdisc-rules-engine (via usdm4) has no py3.13 wheel yet
 dependencies = [
   "usdm4==0.29.0",          # pinned exact — see PINS.md
+  "cdisc-rules-engine==0.17.1",  # CORE engine (transitive via usdm4, which only floors it) — pinned exact, see PINS.md
   "pydantic>=2.7",
   "pymupdf>=1.24",          # PDF text + coords + page-image render
   "pdfplumber>=0.11",       # table-candidate detection
